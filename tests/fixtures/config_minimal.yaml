@@ -62,7 +62,20 @@ parameters:
         e_TPC: 500
 
 solver: {}
-relaxation: {}
+relaxation:
+  enabled: true
+  w_m_values: [250, 100]
+  tpc_eligibility_cost_factors: [0.5]
+  T_increase_factors: [1.5]
+  L_decrease_steps: [1]
+  Q_increase_steps: [1]
+  budget_increase_steps:
+    f: [1]
+    k: [1]
+    B: [2]
+  allow_replace_large_costs: true
+  large_cost_threshold: 1000000000
+  large_cost_replacement: 100000
 exports:
   output_dir: outputs
   write_csv: true

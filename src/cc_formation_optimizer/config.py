@@ -119,6 +119,14 @@ def load_config(path: str | Path) -> OptimizerConfig:
     return config
 
 
+def config_from_dict(raw: dict[str, Any]) -> OptimizerConfig:
+    """Construit et valide une configuration depuis un dictionnaire."""
+
+    config = _parse_config(raw)
+    validate_config(config)
+    return config
+
+
 def validate_config(config: OptimizerConfig) -> None:
     """Valide les invariants metier imposes par le modele."""
 

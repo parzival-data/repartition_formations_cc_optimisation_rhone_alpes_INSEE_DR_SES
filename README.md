@@ -48,7 +48,15 @@ cc-formation-optimizer solve --config config/config_ear2027.yaml --export --map
 
 La carte est creee dans `outputs/maps/solution_map.html`. Elle embarque les donnees de controle dans le HTML et reste un export optionnel : si les coordonnees latitude/longitude sont absentes, elle indique les communes non cartographiees sans bloquer les exports classiques.
 
-L'assouplissement automatique complet sera traite dans une etape ulterieure.
+Resoudre avec assouplissement hierarchique :
+
+```bash
+cc-formation-optimizer solve-relaxed --config config/config_ear2027.yaml --export --map
+```
+
+`solve` utilise strictement la configuration fournie. `solve-relaxed` teste d'abord cette configuration, puis applique les niveaux d'assouplissement configures jusqu'a trouver une solution validee. Chaque tentative est journalisee dans `outputs/reports/journal_assouplissements.json`, avec un rapport lisible dans `outputs/reports/rapport_assouplissements.md` et une copie de la configuration finale dans `outputs/reports/config_finale.yaml` si une solution est retenue.
+
+La contrainte stricte PC vers session TPC n'est jamais relachee automatiquement.
 
 ## Organisation
 

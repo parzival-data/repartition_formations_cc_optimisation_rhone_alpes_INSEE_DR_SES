@@ -11,6 +11,7 @@ from cc_formation_optimizer.export import ExportError, export_solution
 from cc_formation_optimizer.map_export import MapExportError, export_solution_map
 from cc_formation_optimizer.model_builder import build_model
 from cc_formation_optimizer.parameters import build_derived_parameters
+from cc_formation_optimizer.relaxation import export_relaxation_reports, run_relaxation_workflow
 from cc_formation_optimizer.solution_extractor import SolutionExtractionError, extract_solution
 from cc_formation_optimizer.solver import solve_model
 from cc_formation_optimizer.validation import SolutionValidationError, validate_solution
@@ -33,6 +34,12 @@ def build_parser() -> argparse.ArgumentParser:
     solve.add_argument("--export", action="store_true", help="Produit les exports finaux apres validation.")
     solve.add_argument("--map", action="store_true", help="Produit la carte HTML autonome apres validation.")
     solve.add_argument("--output-dir", type=Path, default=None, help="Repertoire racine des exports.")
+
+    solve_relaxed = subparsers.add_parser("solve-relaxed", help="Resout avec assouplissement hierarchique.")
+    solve_relaxed.add_argument("--config", type=Path, default=Path("config/config_ear2027.yaml"))
+    solve_relaxed.add_argument("--export", action="store_true", help="Produit les exports de la solution retenue.")
+    solve_relaxed.add_argument("--map", action="store_true", help="Produit la carte HTML autonome avec --export.")
+    solve_relaxed.add_argument("--output-dir", type=Path, default=None, help="Repertoire racine des exports.")
 
     return parser
 
@@ -117,6 +124,63 @@ def main(argv: list[str] | None = None) -> int:
         elif result.objective_value is not None:
             print(f"Objectif: {result.objective_value}")
         print(f"Temps solveur: {result.wall_time_seconds:.3f}s")
+        return 0
+
+    if args.command == "solve-relaxed":
+        try:
+            communes = load_communes(config)
+            travel_times = load_travel_times(config)
+            compatibilities = load_compatibilities(config)
+            relaxation_result = run_relaxation_workflow(config, communes, travel_times, compatibilities)
+            relaxation_paths = export_relaxation_reports(relaxation_result, args.config, args.output_dir)
+
+            export_result = None
+            map_result = None
+            if args.export and relaxation_result.final_solution is not None:
+                final_config_path = relaxation_paths.get("final_config", args.config)
+                export_result = export_solution(
+                    relaxation_result.final_solution,
+                    relaxation_result.final_validation_report,
+                    relaxation_result.final_model_bundle,
+                    relaxation_result.final_config,
+                    final_config_path,
+                    communes,
+                    args.output_dir,
+                )
+                if args.map:
+                    map_result = export_solution_map(
+                        relaxation_result.final_solution,
+                        relaxation_result.final_validation_report,
+                        relaxation_result.final_model_bundle,
+                        relaxation_result.final_config,
+                        communes,
+                        args.output_dir,
+                    )
+        except (
+            DataLoadingError,
+            ExportError,
+            MapExportError,
+            SolutionExtractionError,
+            SolutionValidationError,
+            ValueError,
+        ) as exc:
+            parser.exit(status=2, message=f"Erreur de donnees ou de modele: {exc}\n")
+
+        accepted = relaxation_result.accepted_attempt
+        print(f"Tentatives: {len(relaxation_result.attempts)}")
+        print(f"Solution acceptee: {'oui' if accepted else 'non'}")
+        if accepted is not None:
+            print(f"Niveau retenu: {accepted.level} ({accepted.level_name})")
+            print(f"Statut solveur: {accepted.solver_status}")
+            print(f"Objectif total: {accepted.objective_total}")
+        print(f"Journal: {relaxation_paths['journal']}")
+        print(f"Rapport: {relaxation_paths['report']}")
+        if "final_config" in relaxation_paths:
+            print(f"Configuration finale: {relaxation_paths['final_config']}")
+        if export_result is not None:
+            print(f"Exports: {export_result.sessions_csv.parent.parent}")
+        if map_result is not None:
+            print(f"Carte: {map_result.html_path}")
         return 0
 
     parser.error(f"Commande inconnue: {args.command}")

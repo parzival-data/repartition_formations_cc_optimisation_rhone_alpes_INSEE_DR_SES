@@ -108,3 +108,19 @@ Les alertes ne sont pas des violations de contraintes. Elles signalent des point
 - pivot avec cout d'eligibilite eleve ;
 - population tres dispersee ;
 - commune affectee a un pivot d'un territoire different.
+
+## Exports d'assouplissement
+
+La commande suivante produit les fichiers de suivi de la hierarchie d'assouplissement :
+
+```bash
+cc-formation-optimizer solve-relaxed --config config/config_ear2027.yaml --export
+```
+
+Fichiers ajoutes :
+
+- `outputs/reports/journal_assouplissements.json` : une entree par tentative, avec parametres modifies et statuts ;
+- `outputs/reports/rapport_assouplissements.md` : rapport lisible expliquant ce qui a ete assoupli ;
+- `outputs/reports/config_finale.yaml` : configuration finale retenue si une solution validee est trouvee.
+
+En cas d'echec complet, le journal et le rapport sont quand meme produits pour diagnostiquer le blocage. `config_finale.yaml` n'est produit que si une solution validee existe.
