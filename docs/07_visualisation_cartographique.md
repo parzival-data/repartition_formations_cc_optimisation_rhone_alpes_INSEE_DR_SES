@@ -37,6 +37,37 @@ La carte sert au controle visuel et metier :
 
 La solution officielle reste celle des exports valides : CSV, rapport Markdown, JSON de statistiques et configuration utilisee.
 
+## Legende
+
+La page HTML contient une legende visible dans le panneau de controle.
+
+Les formes des points indiquent la categorie de la commune :
+
+- cercle : commune PC ;
+- carre : commune TPC.
+
+La taille du symbole indique le role cartographique :
+
+- taille normale : commune affectee a une session ;
+- symbole plus gros : commune pivot d'au moins une session ouverte.
+
+La couleur du point correspond a la session ou au groupe de formation. Comme
+la palette est generee automatiquement, deux sessions peuvent avoir des
+couleurs proches lorsque beaucoup de sessions sont affichees.
+
+Le contour indique le niveau d'alerte :
+
+- `OK` : aucune alerte detectee ;
+- `warning` : point ou session a verifier metieriquement, sans violation
+  bloquante des contraintes ;
+- `error` : anomalie forte ou incoherence detectee dans les controles affiches,
+  si ce niveau est present dans les donnees embarquees.
+
+Les lignes commune -> pivot sont facultatives. Elles sont masquees par defaut
+et peuvent etre affichees avec le filtre "Afficher les liaisons commune ->
+pivot". Lorsque le filtre "Afficher les pivots seulement" est actif, les
+liaisons sont masquees pour garder une lecture claire.
+
 ## Donnees embarquees
 
 Le HTML embarque directement les donnees suivantes :

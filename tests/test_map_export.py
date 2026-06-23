@@ -31,6 +31,16 @@ def test_map_export_creates_html_with_embedded_data(tmp_path: Path) -> None:
     assert "const summary =" in html
     assert "Commune PC" in html
     assert "Commune TPC" in html
+    assert "Légende" in html
+    assert "Cercle : commune PC" in html
+    assert "Carré : commune TPC" in html
+    assert "Symbole plus gros" in html
+    assert "Warning : point ou session à vérifier" in html
+    assert "Error : anomalie forte" in html
+    assert "Ligne commune → pivot" in html
+    assert "height:78vh" in html
+    assert "min-height:680px" in html
+    assert "grid-template-columns:280px minmax(0,1fr)" in html
     assert "unique_assignment" in html
     assert "capacity" in html
     assert "https://data.geopf.fr/wmts" in html
@@ -46,6 +56,8 @@ def test_map_export_creates_html_with_embedded_data(tmp_path: Path) -> None:
     assert "drawTiles" in html
     assert "drawPoints" in html
     assert "tileLayer" in html
+    assert "p.categorie==='PC'?`<circle" in html
+    assert ":`<rect class=\"mapPoint\"" in html
 
 
 def test_map_export_documents_missing_coordinates(tmp_path: Path, valid_solution_bundle) -> None:

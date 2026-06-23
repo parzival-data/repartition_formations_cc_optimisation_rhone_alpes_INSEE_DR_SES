@@ -338,15 +338,15 @@ def _render_html(
     .kpi {{ padding:8px; border:1px solid #374151; border-radius:6px; min-height:58px; }}
     .kpi span {{ display:block; font-size:11px; color:#cbd5e1; }}
     .kpi strong {{ font-size:16px; }}
-    main {{ display:grid; grid-template-columns:320px 1fr; min-height:calc(100vh - 80px); }}
+    main {{ display:grid; grid-template-columns:280px minmax(0,1fr); min-height:calc(100vh - 80px); align-items:start; }}
     aside {{ background:var(--panel); border-right:1px solid var(--line); padding:12px; overflow:auto; }}
-    section {{ padding:10px; }}
+    section {{ padding:10px; min-width:0; }}
     label {{ display:block; font-size:12px; margin-top:8px; color:var(--muted); }}
     select, button {{ width:100%; padding:7px; border:1px solid var(--line); border-radius:6px; background:#fff; }}
     button {{ cursor:pointer; margin-top:8px; }}
     .check {{ display:flex; gap:8px; align-items:center; font-size:13px; margin-top:8px; }}
     .check input {{ width:auto; }}
-    #mapWrap {{ position:relative; height:58vh; min-height:420px; border:1px solid var(--line); background:#eef2f7; overflow:hidden; border-radius:8px; }}
+    #mapWrap {{ position:relative; height:78vh; min-height:680px; border:1px solid var(--line); background:#eef2f7; overflow:hidden; border-radius:8px; }}
     #tileLayer, #svgLayer {{ position:absolute; inset:0; }}
     #tileLayer {{ z-index:1; }}
     #tileLayer img {{ position:absolute; width:256px; height:256px; opacity:.82; }}
@@ -362,6 +362,17 @@ def _render_html(
     .debug dl {{ display:grid; grid-template-columns:180px 1fr; gap:4px 8px; margin:8px 0 0; }}
     .debug dt {{ color:var(--muted); }}
     .debug dd {{ margin:0; font-family:Consolas, monospace; }}
+    .legend {{ background:#fff; border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin-top:12px; font-size:12px; }}
+    .legend summary {{ cursor:pointer; font-weight:600; }}
+    .legend ul {{ list-style:none; padding:0; margin:8px 0 0; display:grid; gap:7px; }}
+    .legend li {{ display:grid; grid-template-columns:26px 1fr; gap:8px; align-items:center; }}
+    .legend .sample {{ width:16px; height:16px; display:inline-block; justify-self:center; background:#2563eb; border:2px solid #fff; box-shadow:0 0 0 1px #9ca3af; }}
+    .legend .circle {{ border-radius:50%; }}
+    .legend .square {{ border-radius:2px; }}
+    .legend .pivot {{ width:22px; height:22px; border-width:3px; }}
+    .legend .warning-sample {{ border-color:var(--warn); box-shadow:none; }}
+    .legend .error-sample {{ border-color:var(--err); box-shadow:none; }}
+    .legend .line-sample {{ width:24px; height:0; border-top:2px solid #2563eb; opacity:.6; }}
     .tables {{ display:grid; grid-template-columns:1fr; gap:12px; margin-top:12px; }}
     table {{ width:100%; border-collapse:collapse; background:#fff; font-size:12px; }}
     th, td {{ border:1px solid var(--line); padding:6px; text-align:left; }}
@@ -394,6 +405,19 @@ const missingCoordinates = {_json(missing)};
     <div class="check"><input id="showLinks" type="checkbox"><span>Afficher les liaisons commune -> pivot</span></div>
     <div class="check"><input id="selectedOnly" type="checkbox"><span>Afficher uniquement la session selectionnee</span></div>
     <button id="resetFilters">Reinitialiser les filtres</button>
+    <details class="legend" open>
+      <summary>Légende</summary>
+      <ul>
+        <li><span class="sample circle"></span><span>Cercle : commune PC.</span></li>
+        <li><span class="sample square"></span><span>Carré : commune TPC.</span></li>
+        <li><span class="sample circle pivot"></span><span>Symbole plus gros : commune pivot d'au moins une session.</span></li>
+        <li><span class="sample circle" style="background:#9333ea"></span><span>Couleur : session ou groupe de formation. Avec beaucoup de sessions, deux couleurs peuvent être proches.</span></li>
+        <li><span class="sample circle"></span><span>Contour normal : OK, aucune alerte détectée.</span></li>
+        <li><span class="sample circle warning-sample"></span><span>Warning : point ou session à vérifier métieriquement, sans violation bloquante.</span></li>
+        <li><span class="sample circle error-sample"></span><span>Error : anomalie forte ou incohérence détectée dans les contrôles affichés.</span></li>
+        <li><span class="line-sample"></span><span>Ligne commune → pivot : liaison facultative, masquée par défaut et affichable avec le filtre dédié.</span></li>
+      </ul>
+    </details>
     <h3>Controles du modele</h3>
     <div id="checks"></div>
     <h3>Communes sans coordonnees</h3>
@@ -556,7 +580,7 @@ function drawPoints(data) {{
   if (document.getElementById('showLinks').checked && !pivotsOnly) {{
     data.forEach(p => {{ const pivot = points.find(q=>q.code_commune===p.code_pivot); if (!pivot) return; const a=project(p), c=project(pivot); svg.insertAdjacentHTML('beforeend', `<line x1="${{a.x}}" y1="${{a.y}}" x2="${{c.x}}" y2="${{c.y}}" stroke="${{colors.get(p.id_session)}}" stroke-width="1" opacity=".35"/>`); }});
   }}
-  data.forEach(p => {{ const c=project(p), color=colors.get(p.id_session)||'#2563eb', size=p.is_pivot?12:8, stroke=p.alert_level==='warning'?'#b45309':p.alert_level==='error'?'#b91c1c':'#fff'; const shape=p.categorie==='PC'?`<rect class="mapPoint" x="${{c.x-size/2}}" y="${{c.y-size/2}}" width="${{size}}" height="${{size}}" rx="2"`:`<circle class="mapPoint" cx="${{c.x}}" cy="${{c.y}}" r="${{size/2}}"`; svg.insertAdjacentHTML('beforeend', `${{shape}} fill="${{color}}" stroke="${{stroke}}" stroke-width="${{p.alert_level==='ok'?1.5:3}}" data-code="${{p.code_commune}}" style="cursor:pointer"/>`); }});
+  data.forEach(p => {{ const c=project(p), color=colors.get(p.id_session)||'#2563eb', size=p.is_pivot?12:8, stroke=p.alert_level==='warning'?'#b45309':p.alert_level==='error'?'#b91c1c':'#fff'; const shape=p.categorie==='PC'?`<circle class="mapPoint" cx="${{c.x}}" cy="${{c.y}}" r="${{size/2}}"`:`<rect class="mapPoint" x="${{c.x-size/2}}" y="${{c.y-size/2}}" width="${{size}}" height="${{size}}" rx="2"`; svg.insertAdjacentHTML('beforeend', `${{shape}} fill="${{color}}" stroke="${{stroke}}" stroke-width="${{p.alert_level==='ok'?1.5:3}}" data-code="${{p.code_commune}}" style="cursor:pointer"/>`); }});
   [...svg.querySelectorAll('.mapPoint')].forEach(el => {{ el.onmousemove = e => showTip(e, points.find(p=>p.code_commune===el.dataset.code)); el.onmouseleave = hideTip; el.onclick = () => {{ const p=points.find(q=>q.code_commune===el.dataset.code); state.selectedSession=p.id_session; showDetail(p); renderTables(data); }}; }});
 }}
 function updateMapDebug(b) {{
