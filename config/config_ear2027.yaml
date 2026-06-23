@@ -98,3 +98,10 @@ exports:
   write_csv: true
   write_xlsx: true
   write_markdown_report: true
+  alerts:
+    capacity_close_ratio: 0.9
+    low_fill_ratio: 0.35
+    travel_close_ratio: 0.9
+    high_tpc_mix_ratio: 0.4
+    high_eligibility_cost: 500
+    population_dispersion_ratio: 5.0

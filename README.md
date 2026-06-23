@@ -32,7 +32,15 @@ cc-formation-optimizer solve --config config/config_ear2027.yaml
 
 Cette commande charge les CSV configures, construit les parametres derives, genere le modele CP-SAT, lance le solveur, extrait la solution metier et lance la validation automatique. Elle affiche le statut, l'objectif total recalcule, le nombre de sessions ouvertes, le nombre de communes affectees, le total de CC et le resultat de validation.
 
-L'assouplissement automatique complet et les exports finaux detailles seront traites dans des etapes ulterieures.
+Produire les exports finaux apres validation :
+
+```bash
+cc-formation-optimizer solve --config config/config_ear2027.yaml --export
+```
+
+Les fichiers sont crees dans `outputs/solutions/` et `outputs/reports/`. Aucun export exploitable n'est produit si la validation echoue.
+
+L'assouplissement automatique complet sera traite dans une etape ulterieure.
 
 ## Organisation
 

@@ -16,4 +16,4 @@ Les composantes `Obj_trajet`, `Obj_eligibilite`, `Obj_mixite` et l'objectif tota
 
 Si une contrainte echoue, `validate_solution()` leve une erreur explicite. Si tout passe, elle retourne un rapport structure indiquant le nombre de sessions, le nombre d'affectations et le nombre total de CC.
 
-Les exports finaux detailles seront ajoutes a l'etape suivante.
+Les exports finaux appellent cette validation avant d'ecrire les fichiers exploitables. Les alertes metier presentes dans les exports sont non bloquantes : elles servent au controle humain, mais ne constituent pas des violations de contraintes.
