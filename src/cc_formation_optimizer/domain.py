@@ -25,6 +25,15 @@ class TravelTime:
 
 
 @dataclass(frozen=True)
+class Compatibility:
+    """Compatibilite metier orientee entre une commune et un pivot."""
+
+    origin_id: str
+    destination_id: str
+    allowed: int
+
+
+@dataclass(frozen=True)
 class FormationSlot:
     """Slot potentiel de formation `(j,m)`."""
 

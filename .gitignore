@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+outputs/**/*.csv
+outputs/**/*.xlsx
+outputs/**/*.md
+outputs/**/*.log

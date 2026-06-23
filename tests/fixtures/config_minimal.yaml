@@ -16,6 +16,7 @@ columns:
   origin_id: commune_origine
   destination_id: commune_destination
   travel_time_minutes: temps_minutes
+  compatibility_allowed: compatible
 
 parameters:
   T: 90
@@ -43,6 +44,18 @@ parameters:
         max: null
         e_PC: 0
         e_TPC: 0
+      - min: 1000
+        max: 1500
+        e_PC: 100
+        e_TPC: 50
+      - min: 500
+        max: 999
+        e_PC: 500
+        e_TPC: 150
+      - min: 0
+        max: 499
+        e_PC: 1000000000
+        e_TPC: 500
 
 solver: {}
 relaxation: {}

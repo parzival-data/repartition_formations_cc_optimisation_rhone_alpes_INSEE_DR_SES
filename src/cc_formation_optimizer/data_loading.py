@@ -2,23 +2,156 @@
 
 from __future__ import annotations
 
+import csv
 from pathlib import Path
+from typing import Any
 
 from cc_formation_optimizer.config import OptimizerConfig
-from cc_formation_optimizer.domain import Commune, TravelTime
+from cc_formation_optimizer.domain import Compatibility, Commune, TravelTime
+
+
+class DataLoadingError(ValueError):
+    """Erreur explicite lors du chargement des donnees."""
 
 
 def load_communes(config: OptimizerConfig, base_dir: Path | None = None) -> list[Commune]:
-    """Charge les communes depuis le fichier configure.
+    """Charge les communes depuis le CSV configure.
 
-    L'implementation complete sera ajoutee lorsque le format exact des fichiers
-    source sera stabilise.
+    Les noms de colonnes proviennent exclusivement de la configuration YAML.
+    Les identifiants sont normalises par suppression des espaces en bordure.
     """
 
-    raise NotImplementedError("Le chargement complet des communes sera implemente dans une etape suivante.")
+    columns = config.columns
+    required = [
+        columns["commune_id"],
+        columns["commune_name"],
+        columns["population"],
+        columns["category"],
+    ]
+    rows = _read_csv(_resolve_path(config.inputs.communes_path, base_dir), required)
+
+    communes: list[Commune] = []
+    seen_ids: set[str] = set()
+    for row_number, row in rows:
+        commune_id = _normalize_id(row[columns["commune_id"]], "commune_id", row_number)
+        if commune_id in seen_ids:
+            raise DataLoadingError(f"Identifiant de commune duplique a la ligne {row_number}: {commune_id}.")
+        seen_ids.add(commune_id)
+
+        name = _require_text(row[columns["commune_name"]], columns["commune_name"], row_number)
+        population = _parse_non_negative_int(row[columns["population"]], columns["population"], row_number)
+        category = _require_text(row[columns["category"]], columns["category"], row_number).upper()
+
+        communes.append(Commune(commune_id=commune_id, name=name, population=population, category=category))
+
+    return communes
 
 
 def load_travel_times(config: OptimizerConfig, base_dir: Path | None = None) -> list[TravelTime]:
-    """Charge les temps de trajet depuis le fichier configure."""
+    """Charge les temps de trajet orientes depuis le CSV configure."""
 
-    raise NotImplementedError("Le chargement complet des trajets sera implemente dans une etape suivante.")
+    columns = config.columns
+    required = [
+        columns["origin_id"],
+        columns["destination_id"],
+        columns["travel_time_minutes"],
+    ]
+    rows = _read_csv(_resolve_path(config.inputs.travel_times_path, base_dir), required)
+
+    travel_times: list[TravelTime] = []
+    for row_number, row in rows:
+        origin_id = _normalize_id(row[columns["origin_id"]], "origin_id", row_number)
+        destination_id = _normalize_id(row[columns["destination_id"]], "destination_id", row_number)
+        minutes = _parse_non_negative_int(row[columns["travel_time_minutes"]], columns["travel_time_minutes"], row_number)
+        travel_times.append(TravelTime(origin_id=origin_id, destination_id=destination_id, minutes=minutes))
+
+    return travel_times
+
+
+def load_compatibilities(config: OptimizerConfig, base_dir: Path | None = None) -> list[Compatibility]:
+    """Charge les compatibilites si un fichier est configure et present.
+
+    Si aucun fichier n'est configure, une liste vide est retournee. Les
+    compatibilites absentes seront interpretees comme autorisees par defaut
+    lors de la construction de `b_ij`.
+    """
+
+    if config.inputs.compatibility_path is None:
+        return []
+
+    path = _resolve_path(config.inputs.compatibility_path, base_dir)
+    if not path.exists():
+        return []
+
+    columns = config.columns
+    allowed_column = columns.get("compatibility_allowed")
+    if not allowed_column:
+        raise DataLoadingError("La colonne de compatibilite doit etre configuree dans columns.compatibility_allowed.")
+
+    required = [columns["origin_id"], columns["destination_id"], allowed_column]
+    rows = _read_csv(path, required)
+
+    compatibilities: list[Compatibility] = []
+    for row_number, row in rows:
+        origin_id = _normalize_id(row[columns["origin_id"]], "origin_id", row_number)
+        destination_id = _normalize_id(row[columns["destination_id"]], "destination_id", row_number)
+        allowed = _parse_binary_int(row[allowed_column], allowed_column, row_number)
+        compatibilities.append(Compatibility(origin_id=origin_id, destination_id=destination_id, allowed=allowed))
+
+    return compatibilities
+
+
+def _resolve_path(path: Path, base_dir: Path | None) -> Path:
+    if path.is_absolute():
+        return path
+    if base_dir is None:
+        return path
+    return base_dir / path
+
+
+def _read_csv(path: Path, required_columns: list[str]) -> list[tuple[int, dict[str, Any]]]:
+    if not path.exists():
+        raise DataLoadingError(f"Fichier introuvable: {path}.")
+
+    with path.open("r", encoding="utf-8-sig", newline="") as stream:
+        reader = csv.DictReader(stream)
+        if reader.fieldnames is None:
+            raise DataLoadingError(f"Le fichier CSV est vide ou sans en-tete: {path}.")
+
+        missing = [column for column in required_columns if column not in reader.fieldnames]
+        if missing:
+            raise DataLoadingError(f"Colonnes obligatoires manquantes dans {path}: {', '.join(missing)}.")
+
+        return [(index, row) for index, row in enumerate(reader, start=2)]
+
+
+def _normalize_id(value: Any, field_name: str, row_number: int) -> str:
+    text = _require_text(value, field_name, row_number)
+    return text
+
+
+def _require_text(value: Any, field_name: str, row_number: int) -> str:
+    if value is None:
+        raise DataLoadingError(f"Valeur obligatoire manquante pour {field_name} a la ligne {row_number}.")
+    text = str(value).strip()
+    if not text:
+        raise DataLoadingError(f"Valeur obligatoire vide pour {field_name} a la ligne {row_number}.")
+    return text
+
+
+def _parse_non_negative_int(value: Any, field_name: str, row_number: int) -> int:
+    text = _require_text(value, field_name, row_number)
+    try:
+        parsed = int(text)
+    except ValueError as exc:
+        raise DataLoadingError(f"Valeur entiere invalide pour {field_name} a la ligne {row_number}: {text}.") from exc
+    if parsed < 0:
+        raise DataLoadingError(f"Valeur negative interdite pour {field_name} a la ligne {row_number}: {parsed}.")
+    return parsed
+
+
+def _parse_binary_int(value: Any, field_name: str, row_number: int) -> int:
+    parsed = _parse_non_negative_int(value, field_name, row_number)
+    if parsed not in (0, 1):
+        raise DataLoadingError(f"Le champ {field_name} doit valoir 0 ou 1 a la ligne {row_number}.")
+    return parsed
