@@ -90,6 +90,29 @@ def test_map_export_keeps_points_available_when_tiles_fail(tmp_path: Path) -> No
     assert "const points =" in html
 
 
+def test_map_export_pivots_only_filter_uses_boolean_pivot_flag(tmp_path: Path) -> None:
+    config, bundle, solution, report, communes = _valid_solution_with_coordinates()
+
+    result = export_solution_map(solution, report, bundle, config, communes, tmp_path)
+    html = result.html_path.read_text(encoding="utf-8")
+    points = _extract_js_payload(html, "points")
+
+    assert any(point["is_pivot"] is True for point in points)
+    assert any(point["is_pivot"] is False for point in points)
+    assert all(isinstance(point["is_pivot"], bool) for point in points)
+    assert '"is_pivot": true' in html
+    assert '"is_pivot": "true"' not in html
+    assert '"is_pivot": 1' not in html
+    assert '<input id="pivotOnly" type="checkbox">' in html
+    assert "Afficher les pivots seulement" in html
+    assert "'pivotOnly','showLinks','selectedOnly'" in html
+    assert "addEventListener('change', render)" in html
+    assert "if (pivotsOnly && p.is_pivot !== true) return false;" in html
+    assert "drawPoints(data)" in html
+    assert "function drawPoints(data)" in html
+    assert "showLinks').checked && !pivotsOnly" in html
+
+
 def _extract_js_payload(html: str, name: str):
     match = re.search(rf"const {name} = (.*?);", html, flags=re.DOTALL)
     assert match is not None

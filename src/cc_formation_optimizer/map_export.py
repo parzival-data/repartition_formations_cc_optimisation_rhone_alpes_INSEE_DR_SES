@@ -107,6 +107,7 @@ def _build_points(
     config: OptimizerConfig,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     sessions_by_id = {session.id_session: session for session in solution.sessions}
+    open_pivot_ids = {session.code_pivot for session in solution.sessions}
     points: list[dict[str, Any]] = []
     missing: list[dict[str, Any]] = []
     for assignment in solution.assignments:
@@ -130,7 +131,7 @@ def _build_points(
             "type_session": assignment.type_session,
             "rang_m": session.rang_m,
             "temps_trajet_minutes": assignment.temps_trajet_minutes,
-            "is_pivot": assignment.code_commune == assignment.code_pivot,
+            "is_pivot": assignment.code_commune in open_pivot_ids,
             "is_same_territory_as_pivot": _same_territory(commune, pivot),
             "is_travel_near_limit": assignment.temps_trajet_minutes / config.parameters.T
             >= config.exports["alerts"]["travel_close_ratio"],
@@ -152,6 +153,7 @@ def _build_points_from_export_rows(
     config: OptimizerConfig,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     sessions_by_id = {row["id_session"]: row for row in session_rows}
+    open_pivot_ids = {row["code_pivot"] for row in session_rows}
     points: list[dict[str, Any]] = []
     missing: list[dict[str, Any]] = []
     for row in assignment_rows:
@@ -176,7 +178,7 @@ def _build_points_from_export_rows(
             "type_session": row["type_session"],
             "rang_m": _to_int(session.get("rang_m")),
             "temps_trajet_minutes": travel_time,
-            "is_pivot": row["code_commune"] == row["code_pivot"],
+            "is_pivot": row["code_commune"] in open_pivot_ids,
             "is_same_territory_as_pivot": _same_territory(commune, pivot),
             "is_travel_near_limit": travel_time / config.parameters.T >= config.exports["alerts"]["travel_close_ratio"],
             "is_category_mismatch": row["categorie"] != row["type_session"],
@@ -439,7 +441,17 @@ function setupFilters() {{
 }}
 function filteredPoints() {{
   const territory = document.getElementById('territoryFilter').value, type = document.getElementById('sessionTypeFilter').value, cat = document.getElementById('categoryFilter').value, alert = document.getElementById('alertFilter').value;
-  return points.filter(p => (!territory || p.territoire_EAR===territory) && (!type || p.type_session===type) && (!cat || p.categorie===cat) && (!alert || p.alert_level===alert) && (!document.getElementById('pivotOnly').checked || p.is_pivot) && (!document.getElementById('selectedOnly').checked || !state.selectedSession || p.id_session===state.selectedSession));
+  const pivotsOnly = document.getElementById('pivotOnly').checked;
+  const selectedOnly = document.getElementById('selectedOnly').checked;
+  return points.filter(p => {{
+    if (territory && p.territoire_EAR !== territory) return false;
+    if (type && p.type_session !== type) return false;
+    if (cat && p.categorie !== cat) return false;
+    if (alert && p.alert_level !== alert) return false;
+    if (pivotsOnly && p.is_pivot !== true) return false;
+    if (selectedOnly && state.selectedSession && p.id_session !== state.selectedSession) return false;
+    return true;
+  }});
 }}
 function validGeoPoints() {{ return points.filter(p => Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lon))); }}
 function bounds(data) {{ const xs=data.map(p=>Number(p.lon)), ys=data.map(p=>Number(p.lat)); return {{ minLon:Math.min(...xs), maxLon:Math.max(...xs), minLat:Math.min(...ys), maxLat:Math.max(...ys) }}; }}
@@ -540,7 +552,8 @@ function render() {{
   renderTables(data); renderCharts(); updateMapDebug(b);
 }}
 function drawPoints(data) {{
-  if (document.getElementById('showLinks').checked) {{
+  const pivotsOnly = document.getElementById('pivotOnly').checked;
+  if (document.getElementById('showLinks').checked && !pivotsOnly) {{
     data.forEach(p => {{ const pivot = points.find(q=>q.code_commune===p.code_pivot); if (!pivot) return; const a=project(p), c=project(pivot); svg.insertAdjacentHTML('beforeend', `<line x1="${{a.x}}" y1="${{a.y}}" x2="${{c.x}}" y2="${{c.y}}" stroke="${{colors.get(p.id_session)}}" stroke-width="1" opacity=".35"/>`); }});
   }}
   data.forEach(p => {{ const c=project(p), color=colors.get(p.id_session)||'#2563eb', size=p.is_pivot?12:8, stroke=p.alert_level==='warning'?'#b45309':p.alert_level==='error'?'#b91c1c':'#fff'; const shape=p.categorie==='PC'?`<rect class="mapPoint" x="${{c.x-size/2}}" y="${{c.y-size/2}}" width="${{size}}" height="${{size}}" rx="2"`:`<circle class="mapPoint" cx="${{c.x}}" cy="${{c.y}}" r="${{size/2}}"`; svg.insertAdjacentHTML('beforeend', `${{shape}} fill="${{color}}" stroke="${{stroke}}" stroke-width="${{p.alert_level==='ok'?1.5:3}}" data-code="${{p.code_commune}}" style="cursor:pointer"/>`); }});

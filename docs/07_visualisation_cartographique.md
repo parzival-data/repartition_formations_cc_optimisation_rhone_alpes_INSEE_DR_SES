@@ -31,6 +31,7 @@ La carte sert au controle visuel et metier :
 - verifier les affectations commune -> pivot ;
 - reperer les temps de trajet proches de `T` ;
 - identifier les sessions mixtes ou multi-territoires ;
+- afficher uniquement les communes pivots qui accueillent au moins une session ;
 - parcourir les controles du modele ;
 - consulter les tableaux de sessions et de communes.
 
