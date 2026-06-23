@@ -24,7 +24,13 @@ Afficher un resume de configuration :
 cc-formation-optimizer show-config --config config/config_ear2027.yaml
 ```
 
-Les commandes de diagnostic, construction du modele, resolution et export sont prevues dans l'architecture, mais le solveur CP-SAT complet n'est pas encore implemente a cette etape.
+Construire et resoudre le modele CP-SAT minimal :
+
+```bash
+cc-formation-optimizer solve --config config/config_ear2027.yaml
+```
+
+Cette commande charge les CSV configures, construit les parametres derives, genere le modele CP-SAT, lance le solveur et affiche le statut ainsi que la valeur d'objectif si une solution est trouvee. L'assouplissement automatique complet et les exports finaux detailles seront traites dans des etapes ulterieures.
 
 ## Organisation
 

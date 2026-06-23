@@ -53,7 +53,7 @@ Obj_mixite = sum_j,m d_jm
 
 ## Contraintes
 
-Les contraintes seront implementees dans `model_builder.py` lors de l'etape solveur :
+Les contraintes suivantes sont implementees dans `model_builder.py` :
 
 1. affectation unique de chaque commune ;
 2. pas d'affectation sans ouverture ;
@@ -65,3 +65,7 @@ Les contraintes seront implementees dans `model_builder.py` lors de l'etape solv
 8. asymetrie stricte PC -> TPC ;
 9. definition de la mixite residuelle ;
 10. domaines des variables.
+
+Les variables `x_ijm` ne sont creees que pour les couples `(i,j)` admissibles et compatibles. Un trajet absent de la matrice `tau` ne cree donc aucune variable d'affectation.
+
+La formulation CP-SAT reste lineaire : le cout d'eligibilite utilise `e_j^PC * y_jm + (e_j^TPC - e_j^PC) * z_jm`, et le budget PC utilise `y_jm - z_jm`. Aucun produit entre variables n'est introduit.

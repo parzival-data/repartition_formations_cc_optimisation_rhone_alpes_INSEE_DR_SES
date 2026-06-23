@@ -6,6 +6,10 @@ import argparse
 from pathlib import Path
 
 from cc_formation_optimizer.config import ConfigError, load_config
+from cc_formation_optimizer.data_loading import DataLoadingError, load_communes, load_compatibilities, load_travel_times
+from cc_formation_optimizer.model_builder import build_model
+from cc_formation_optimizer.parameters import build_derived_parameters
+from cc_formation_optimizer.solver import solve_model
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -19,6 +23,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     show = subparsers.add_parser("show-config", help="Affiche un resume de la configuration.")
     show.add_argument("--config", type=Path, default=Path("config/config_ear2027.yaml"))
+
+    solve = subparsers.add_parser("solve", help="Construit et resout le modele CP-SAT minimal.")
+    solve.add_argument("--config", type=Path, default=Path("config/config_ear2027.yaml"))
 
     return parser
 
@@ -45,6 +52,23 @@ def main(argv: list[str] | None = None) -> int:
         print(f"T={params.T}, Q={params.Q}, L={params.L}")
         print(f"B={budgets.B}, f={budgets.f}, k={budgets.k}")
         print(f"M_PC={params.pivot_slots.M_PC}, M_TPC={params.pivot_slots.M_TPC}")
+        return 0
+
+    if args.command == "solve":
+        try:
+            communes = load_communes(config)
+            travel_times = load_travel_times(config)
+            compatibilities = load_compatibilities(config)
+            derived = build_derived_parameters(communes, travel_times, compatibilities, config)
+            model_bundle = build_model(derived, config)
+            result = solve_model(model_bundle, config)
+        except (DataLoadingError, ValueError) as exc:
+            parser.exit(status=2, message=f"Erreur de donnees ou de modele: {exc}\n")
+
+        print(f"Statut: {result.status}")
+        if result.objective_value is not None:
+            print(f"Objectif: {result.objective_value}")
+        print(f"Temps solveur: {result.wall_time_seconds:.3f}s")
         return 0
 
     parser.error(f"Commande inconnue: {args.command}")
