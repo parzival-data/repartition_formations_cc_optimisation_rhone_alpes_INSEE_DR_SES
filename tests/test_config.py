@@ -35,8 +35,10 @@ def test_main_config_is_valid() -> None:
     budgets = config.parameters.formation_budgets
 
     assert budgets.B == budgets.f + budgets.k
-    assert config.parameters.T == 90
-    assert config.parameters.Q == 11
+    assert config.parameters.T == 75
+    assert config.parameters.Q == 14
+    assert config.parameters.L == 6
+    assert config.solver["time_limit_seconds"] == 1200
 
 
 def test_rejects_budget_inconsistent_with_model(tmp_path: Path) -> None:

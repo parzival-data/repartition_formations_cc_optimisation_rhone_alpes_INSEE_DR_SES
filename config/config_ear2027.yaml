@@ -73,9 +73,9 @@ data_preparation:
     default_when_absent: 1
 
 parameters:
-  T: 90
-  Q: 11
-  L: 1
+  T: 75
+  Q: 14
+  L: 6
   formation_budgets:
     B: 55
     f: 45
@@ -112,7 +112,7 @@ parameters:
         e_TPC: 500
 
 solver:
-  time_limit_seconds: 600
+  time_limit_seconds: 1200
   num_workers: 8
   random_seed: 1
   log_search_progress: true
