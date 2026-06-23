@@ -4,9 +4,9 @@ metadata:
   description: Configuration initiale pour la repartition des CC en formations EAR 2027.
 
 inputs:
-  communes_path: data/raw/communes.csv
-  travel_times_path: data/raw/temps_trajet.csv
-  compatibility_path: data/raw/compatibilites.csv
+  communes_path: data/processed/communes_clean.csv
+  travel_times_path: data/processed/temps_trajet_clean.csv
+  compatibility_path: null
   missing_travel_time_policy: forbidden
 
 columns:
@@ -18,10 +18,40 @@ columns:
   housing: logements
   latitude: latitude
   longitude: longitude
-  origin_id: commune_origine
-  destination_id: commune_destination
+  origin_id: code_commune_origine
+  destination_id: code_commune_pivot
   travel_time_minutes: temps_minutes
   compatibility_allowed: compatible
+
+data_preparation:
+  input_dir: donnee_brut_EAR27
+  output_dir: data/processed
+  communes:
+    file: info_minimum.ods
+    sheet: Feuille1
+    columns:
+      code_commune: Code commune
+      nom_commune: Commune
+      categorie: Catégorie
+      territoire_EAR: Territoire EAR 2027
+      population: Population 2023
+      logements: Logements 2023
+      latitude: Latitude
+      longitude: Longitude
+    category_mapping:
+      PC: PC
+      TPC: TPC
+    output: data/processed/communes_clean.csv
+  travel_times:
+    file: matrice_temps_trajets_max_90min.ods
+    sheet: matrix_minutes
+    format: wide_matrix
+    origin_column: origin
+    output: data/processed/temps_trajet_clean.csv
+  compatibilities:
+    file:
+    output: data/processed/compatibilites_clean.csv
+    default_when_absent: 1
 
 parameters:
   T: 90

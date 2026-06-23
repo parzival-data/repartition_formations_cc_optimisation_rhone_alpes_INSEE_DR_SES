@@ -24,6 +24,24 @@ Afficher un resume de configuration :
 cc-formation-optimizer show-config --config config/config_ear2027.yaml
 ```
 
+Preparer les donnees reelles :
+
+```bash
+cc-formation-optimizer prepare-data --config config/config_ear2027.yaml --input-dir donnee_brut_EAR27 --output-dir data/processed --report
+```
+
+Cette commande lit les fichiers bruts `.ods`, applique les mappings declares
+dans `config/config_ear2027.yaml`, produit les CSV propres dans
+`data/processed/` et genere un rapport dans `outputs/reports/`. Utiliser
+`--dry-run` pour analyser sans ecrire et `--strict` pour echouer en presence
+d'anomalies bloquantes.
+
+Verifier les donnees preparees sans lancer de resolution longue :
+
+```bash
+cc-formation-optimizer diagnose --config config/config_ear2027.yaml
+```
+
 Construire et resoudre le modele CP-SAT minimal :
 
 ```bash
@@ -61,7 +79,7 @@ La contrainte stricte PC vers session TPC n'est jamais relachee automatiquement.
 ## Organisation
 
 - `config/` : configuration YAML et schema documentaire.
-- `data/` : donnees brutes, donnees transformees et echantillons.
+- `data/` : donnees brutes, donnees transformees et echantillons. Les donnees brutes et preparees reelles sont ignorees par Git.
 - `docs/` : documentation Markdown de la modelisation et du projet.
 - `src/cc_formation_optimizer/` : package Python.
 - `tests/` : tests automatises et fixtures.
