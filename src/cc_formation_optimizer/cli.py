@@ -8,6 +8,7 @@ from pathlib import Path
 from cc_formation_optimizer.config import ConfigError, load_config
 from cc_formation_optimizer.data_loading import DataLoadingError, load_communes, load_compatibilities, load_travel_times
 from cc_formation_optimizer.export import ExportError, export_solution
+from cc_formation_optimizer.map_export import MapExportError, export_solution_map
 from cc_formation_optimizer.model_builder import build_model
 from cc_formation_optimizer.parameters import build_derived_parameters
 from cc_formation_optimizer.solution_extractor import SolutionExtractionError, extract_solution
@@ -30,6 +31,7 @@ def build_parser() -> argparse.ArgumentParser:
     solve = subparsers.add_parser("solve", help="Construit et resout le modele CP-SAT minimal.")
     solve.add_argument("--config", type=Path, default=Path("config/config_ear2027.yaml"))
     solve.add_argument("--export", action="store_true", help="Produit les exports finaux apres validation.")
+    solve.add_argument("--map", action="store_true", help="Produit la carte HTML autonome apres validation.")
     solve.add_argument("--output-dir", type=Path, default=None, help="Repertoire racine des exports.")
 
     return parser
@@ -82,7 +84,23 @@ def main(argv: list[str] | None = None) -> int:
                         communes,
                         args.output_dir,
                     )
-        except (DataLoadingError, ExportError, SolutionExtractionError, SolutionValidationError, ValueError) as exc:
+                if args.map:
+                    map_result = export_solution_map(
+                        solution,
+                        validation_report,
+                        model_bundle,
+                        config,
+                        communes,
+                        args.output_dir,
+                    )
+        except (
+            DataLoadingError,
+            ExportError,
+            MapExportError,
+            SolutionExtractionError,
+            SolutionValidationError,
+            ValueError,
+        ) as exc:
             parser.exit(status=2, message=f"Erreur de donnees ou de modele: {exc}\n")
 
         print(f"Statut: {result.status}")
@@ -94,6 +112,8 @@ def main(argv: list[str] | None = None) -> int:
             print("Validation: OK")
             if args.export:
                 print(f"Exports: {export_result.sessions_csv.parent.parent}")
+            if args.map:
+                print(f"Carte: {map_result.html_path}")
         elif result.objective_value is not None:
             print(f"Objectif: {result.objective_value}")
         print(f"Temps solveur: {result.wall_time_seconds:.3f}s")

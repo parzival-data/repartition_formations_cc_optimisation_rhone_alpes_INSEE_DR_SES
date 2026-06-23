@@ -15,6 +15,8 @@ class Commune:
     category: str
     territory_ear: str | None = None
     housing: int | None = None
+    latitude: float | None = None
+    longitude: float | None = None
 
 
 @dataclass(frozen=True)

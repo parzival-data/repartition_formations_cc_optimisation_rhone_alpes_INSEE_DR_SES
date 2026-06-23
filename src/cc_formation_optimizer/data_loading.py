@@ -43,6 +43,8 @@ def load_communes(config: OptimizerConfig, base_dir: Path | None = None) -> list
         category = _require_text(row[columns["category"]], columns["category"], row_number).upper()
         territory_ear = _optional_text(row, columns.get("territory_ear"))
         housing = _optional_non_negative_int(row, columns.get("housing"), row_number)
+        latitude = _optional_float(row, columns.get("latitude"), row_number)
+        longitude = _optional_float(row, columns.get("longitude"), row_number)
 
         communes.append(
             Commune(
@@ -52,6 +54,8 @@ def load_communes(config: OptimizerConfig, base_dir: Path | None = None) -> list
                 category=category,
                 territory_ear=territory_ear,
                 housing=housing,
+                latitude=latitude,
+                longitude=longitude,
             )
         )
 
@@ -185,3 +189,16 @@ def _optional_non_negative_int(row: dict[str, Any], column_name: str | None, row
     if value is None or str(value).strip() == "":
         return None
     return _parse_non_negative_int(value, column_name, row_number)
+
+
+def _optional_float(row: dict[str, Any], column_name: str | None, row_number: int) -> float | None:
+    if not column_name or column_name not in row:
+        return None
+    value = row[column_name]
+    if value is None or str(value).strip() == "":
+        return None
+    text = str(value).strip().replace(",", ".")
+    try:
+        return float(text)
+    except ValueError as exc:
+        raise DataLoadingError(f"Valeur decimale invalide pour {column_name} a la ligne {row_number}: {text}.") from exc

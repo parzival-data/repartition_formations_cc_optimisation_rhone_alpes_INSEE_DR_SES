@@ -16,6 +16,8 @@ columns:
   category: categorie
   territory_ear: territoire_EAR
   housing: logements
+  latitude: latitude
+  longitude: longitude
   origin_id: commune_origine
   destination_id: commune_destination
   travel_time_minutes: temps_minutes

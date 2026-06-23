@@ -40,6 +40,14 @@ cc-formation-optimizer solve --config config/config_ear2027.yaml --export
 
 Les fichiers sont crees dans `outputs/solutions/` et `outputs/reports/`. Aucun export exploitable n'est produit si la validation echoue.
 
+Produire aussi la carte HTML autonome :
+
+```bash
+cc-formation-optimizer solve --config config/config_ear2027.yaml --export --map
+```
+
+La carte est creee dans `outputs/maps/solution_map.html`. Elle embarque les donnees de controle dans le HTML et reste un export optionnel : si les coordonnees latitude/longitude sont absentes, elle indique les communes non cartographiees sans bloquer les exports classiques.
+
 L'assouplissement automatique complet sera traite dans une etape ulterieure.
 
 ## Organisation

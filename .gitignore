@@ -8,3 +8,6 @@ outputs/**/*.csv
 outputs/**/*.xlsx
 outputs/**/*.md
 outputs/**/*.log
+outputs/**/*.html
+outputs/**/*.json
+outputs/**/*.yaml

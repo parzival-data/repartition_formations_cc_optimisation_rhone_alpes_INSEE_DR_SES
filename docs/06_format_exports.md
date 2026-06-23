@@ -79,6 +79,23 @@ Export optionnel si `openpyxl` est disponible dans l'environnement. Il contient 
 
 Si la dependance n'est pas disponible, les exports CSV, Markdown, JSON et YAML restent produits.
 
+### `outputs/maps/solution_map.html`
+
+Export HTML autonome de controle visuel et metier. Il est produit avec :
+
+```bash
+cc-formation-optimizer solve --config config/config_ear2027.yaml --export --map
+```
+
+Les donnees sont embarquees directement dans le fichier HTML sous forme de constantes JavaScript :
+
+- `globalStats` ;
+- `validationChecks` ;
+- `points` ;
+- `summary`.
+
+La carte utilise du JavaScript natif et un SVG pour dessiner les communes, les pivots et les liaisons optionnelles commune -> pivot. Les points restent visibles meme sans fond de carte externe. Les coordonnees latitude/longitude sont optionnelles : les communes sans coordonnees sont listees dans le panneau de controle et ne bloquent pas les autres exports.
+
 ## Alertes metier
 
 Les alertes ne sont pas des violations de contraintes. Elles signalent des points a controler :
