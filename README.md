@@ -71,6 +71,19 @@ cc-formation-optimizer solve --config config/config_ear2027.yaml --export --map
 
 La carte est creee dans `outputs/maps/solution_map.html`. Elle embarque les donnees de controle dans le HTML et reste un export optionnel : si les coordonnees latitude/longitude sont absentes, elle indique les communes non cartographiees sans bloquer les exports classiques.
 
+Regenerer uniquement la carte depuis des exports existants, sans relancer le solveur :
+
+```bash
+cc-formation-optimizer render-map --config config/config_ear2027.yaml --solution-dir outputs
+```
+
+Cette commande lit `outputs/solutions/sessions.csv`,
+`outputs/solutions/communes_affectees.csv` et
+`outputs/reports/statistiques_solution.json`, recharge les communes propres
+configurees pour les coordonnees, puis reecrit
+`outputs/maps/solution_map.html`. Elle est destinee au debogage cartographique
+quand la solution d'optimisation existe deja.
+
 Resoudre avec assouplissement hierarchique :
 
 ```bash
@@ -80,6 +93,18 @@ cc-formation-optimizer solve-relaxed --config config/config_ear2027.yaml --expor
 `solve` utilise strictement la configuration fournie. `solve-relaxed` teste d'abord cette configuration, puis applique les niveaux d'assouplissement configures jusqu'a trouver une solution validee. Chaque tentative est journalisee dans `outputs/reports/journal_assouplissements.json`, avec un rapport lisible dans `outputs/reports/rapport_assouplissements.md` et une copie de la configuration finale dans `outputs/reports/config_finale.yaml` si une solution est retenue.
 
 La contrainte stricte PC vers session TPC n'est jamais relachee automatiquement.
+
+## Depannage de la carte
+
+Si le fond de carte ne s'affiche pas, verifier l'acces reseau a
+`https://data.geopf.fr/wmts` et les requetes navigateur vers `data.geopf.fr`.
+Les points doivent rester visibles meme si le fond WMTS echoue.
+
+Si les points semblent mal places, verifier que `latitude` vient de `lat` et
+`longitude` de `lon`. Pour Auvergne-Rhone-Alpes, les latitudes attendues sont
+autour de 44 a 47 et les longitudes autour de 2 a 7. Le panneau repliable
+"Debug carte" dans le HTML affiche les bounds, le centre initial, le zoom
+initial, le nombre de points avec coordonnees et les erreurs de tuiles.
 
 ## Organisation
 

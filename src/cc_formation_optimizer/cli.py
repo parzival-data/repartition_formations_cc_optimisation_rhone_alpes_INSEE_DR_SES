@@ -10,7 +10,7 @@ from cc_formation_optimizer.data_preparation import DataPreparationError, prepar
 from cc_formation_optimizer.data_loading import DataLoadingError, load_communes, load_compatibilities, load_travel_times
 from cc_formation_optimizer.diagnostics import run_pre_solve_diagnostics
 from cc_formation_optimizer.export import ExportError, export_solution
-from cc_formation_optimizer.map_export import MapExportError, export_solution_map
+from cc_formation_optimizer.map_export import MapExportError, export_solution_map, render_map_from_exports
 from cc_formation_optimizer.model_builder import build_model
 from cc_formation_optimizer.parameters import build_derived_parameters
 from cc_formation_optimizer.relaxation import export_relaxation_reports, run_relaxation_workflow
@@ -53,6 +53,14 @@ def build_parser() -> argparse.ArgumentParser:
     solve_relaxed.add_argument("--export", action="store_true", help="Produit les exports de la solution retenue.")
     solve_relaxed.add_argument("--map", action="store_true", help="Produit la carte HTML autonome avec --export.")
     solve_relaxed.add_argument("--output-dir", type=Path, default=None, help="Repertoire racine des exports.")
+
+    render_map = subparsers.add_parser("render-map", help="Regenere la carte depuis des exports existants, sans solveur.")
+    render_map.add_argument("--config", type=Path, default=Path("config/config_ear2027.yaml"))
+    render_map.add_argument("--solution-dir", type=Path, default=None, help="Racine contenant solutions/ et reports/.")
+    render_map.add_argument("--sessions", type=Path, default=None, help="CSV sessions existant.")
+    render_map.add_argument("--assignments", type=Path, default=None, help="CSV communes affectees existant.")
+    render_map.add_argument("--stats", type=Path, default=None, help="JSON statistiques solution existant.")
+    render_map.add_argument("--output", type=Path, default=None, help="Fichier HTML de sortie.")
 
     return parser
 
@@ -139,6 +147,25 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Coordonnees carte: {coords_available}/{len(communes)}")
         if diagnostic.budget_warning:
             print(f"Alerte budget: {diagnostic.budget_warning}")
+        return 0
+
+    if args.command == "render-map":
+        try:
+            map_result = render_map_from_exports(
+                config,
+                solution_dir=args.solution_dir,
+                sessions_path=args.sessions,
+                assignments_path=args.assignments,
+                stats_path=args.stats,
+                output_path=args.output,
+            )
+        except (DataLoadingError, MapExportError, ValueError) as exc:
+            parser.exit(status=2, message=f"Erreur de generation de carte: {exc}\n")
+
+        print(f"Carte: {map_result.html_path}")
+        print(f"Points cartographies: {map_result.mapped_points}")
+        print(f"Communes sans coordonnees: {map_result.missing_coordinates}")
+        print("Solveur: non relance")
         return 0
 
     if args.command == "solve":
