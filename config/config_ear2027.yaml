@@ -1,0 +1,98 @@
+metadata:
+  name: ear2027_formations_cc
+  version: v1
+  description: Configuration initiale pour la repartition des CC en formations EAR 2027.
+
+inputs:
+  communes_path: data/raw/communes.csv
+  travel_times_path: data/raw/temps_trajet.csv
+  compatibility_path: data/raw/compatibilites.csv
+  missing_travel_time_policy: forbidden
+
+columns:
+  commune_id: code_commune
+  commune_name: nom_commune
+  population: population
+  category: categorie
+  origin_id: commune_origine
+  destination_id: commune_destination
+  travel_time_minutes: temps_minutes
+  compatibility_allowed: compatible
+
+parameters:
+  T: 90
+  Q: 11
+  L: 1
+  formation_budgets:
+    B: 55
+    f: 45
+    k: 10
+  cc_count:
+    threshold_population: 5000
+    below_or_equal: 1
+    above: 2
+  pivot_slots:
+    M_PC: 3
+    M_TPC: 1
+  objective_weights:
+    w_t: 1
+    w_e: 1000
+    w_m: 500
+  eligibility_costs:
+    infinity: 1000000000
+    population_bands:
+      - min: 1501
+        max: null
+        e_PC: 0
+        e_TPC: 0
+      - min: 1000
+        max: 1500
+        e_PC: 100
+        e_TPC: 50
+      - min: 500
+        max: 999
+        e_PC: 500
+        e_TPC: 150
+      - min: 0
+        max: 499
+        e_PC: 1000000000
+        e_TPC: 500
+
+solver:
+  time_limit_seconds: 600
+  num_workers: 8
+  random_seed: 1
+  log_search_progress: true
+
+relaxation:
+  enabled: true
+  levels:
+    - name: reduce_mixing_weight
+      parameter: parameters.objective_weights.w_m
+      values: [250, 100, 50]
+    - name: reduce_tpc_eligibility_costs
+      parameter_group: parameters.eligibility_costs.population_bands.e_TPC
+      factors: [0.75, 0.5]
+    - name: increase_T
+      parameter: parameters.T
+      relative_increases: [0.10, 0.20, 0.30]
+    - name: reduce_L
+      parameter: parameters.L
+      decrements: [1]
+    - name: increase_Q
+      parameter: parameters.Q
+      increments: [1, 2]
+    - name: increase_budgets
+      parameter_group: parameters.formation_budgets
+      increments:
+        f: [1, 2]
+        k: [1, 2]
+    - name: replace_infinity_last_resort
+      parameter: parameters.eligibility_costs.infinity
+      enabled: true
+
+exports:
+  output_dir: outputs
+  write_csv: true
+  write_xlsx: true
+  write_markdown_report: true

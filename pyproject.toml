@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cc-formation-optimizer"
+version = "0.1.0"
+description = "Optimisation de la repartition des coordonnateurs communaux en formations EAR 2027."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[project.scripts]
+cc-formation-optimizer = "cc_formation_optimizer.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cc_formation_optimizer"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

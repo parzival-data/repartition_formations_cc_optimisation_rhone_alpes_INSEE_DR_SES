@@ -1,0 +1,49 @@
+metadata:
+  name: test_config
+  version: test
+
+inputs:
+  communes_path: tests/fixtures/communes_minimal.csv
+  travel_times_path: tests/fixtures/temps_trajet_minimal.csv
+  compatibility_path: null
+  missing_travel_time_policy: forbidden
+
+columns:
+  commune_id: code_commune
+  commune_name: nom_commune
+  population: population
+  category: categorie
+  origin_id: commune_origine
+  destination_id: commune_destination
+  travel_time_minutes: temps_minutes
+
+parameters:
+  T: 90
+  Q: 11
+  L: 1
+  formation_budgets:
+    B: 55
+    f: 45
+    k: 10
+  cc_count:
+    threshold_population: 5000
+    below_or_equal: 1
+    above: 2
+  pivot_slots:
+    M_PC: 3
+    M_TPC: 1
+  objective_weights:
+    w_t: 1
+    w_e: 1000
+    w_m: 500
+  eligibility_costs:
+    infinity: 1000000000
+    population_bands:
+      - min: 1501
+        max: null
+        e_PC: 0
+        e_TPC: 0
+
+solver: {}
+relaxation: {}
+exports: {}

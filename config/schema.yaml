@@ -1,0 +1,36 @@
+metadata:
+  required: [name, version]
+inputs:
+  required:
+    - communes_path
+    - travel_times_path
+    - missing_travel_time_policy
+columns:
+  required:
+    - commune_id
+    - commune_name
+    - population
+    - category
+    - origin_id
+    - destination_id
+    - travel_time_minutes
+parameters:
+  required:
+    - T
+    - Q
+    - L
+    - formation_budgets
+    - cc_count
+    - pivot_slots
+    - objective_weights
+    - eligibility_costs
+  invariants:
+    - T > 0
+    - 0 < L <= Q
+    - formation_budgets.B == formation_budgets.f + formation_budgets.k
+    - pivot_slots.M_PC == 3
+    - pivot_slots.M_TPC == 1
+    - cc_count.threshold_population == 5000
+    - objective_weights.w_t > 0
+    - objective_weights.w_e > 0
+    - objective_weights.w_m > 0
