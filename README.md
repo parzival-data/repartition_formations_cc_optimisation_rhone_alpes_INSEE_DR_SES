@@ -2,7 +2,7 @@
 
 Ce depot contient le socle Python d'un outil d'optimisation pour organiser les sessions de formation des coordonnateurs communaux (CC) des communes PC/TPC pour l'EAR 2027.
 
-Le modele cible est celui de la specification fournie : un seul seuil de trajet `T`, une capacite `Q`, des budgets `f`, `k`, `B` avec `B = f + k`, des slots `M_PC = 3` et `M_TPC = 1`, et une separation PC -> TPC stricte traitee comme contrainte dure dans le modele futur.
+Le modele est celui de la specification fournie : un seul seuil de trajet `T`, une capacite `Q`, des budgets `f`, `k`, `B` avec `B = f + k`, des slots `M_PC = 3` et `M_TPC = 1`, et une separation PC -> TPC stricte traitee comme contrainte dure.
 
 ## Installation
 
@@ -114,3 +114,14 @@ initial, le nombre de points avec coordonnees et les erreurs de tuiles.
 - `src/cc_formation_optimizer/` : package Python.
 - `tests/` : tests automatises et fixtures.
 - `outputs/` : sorties generees par les futures executions.
+
+## Documentation
+
+- [Vue d'ensemble](docs/00_vue_ensemble.md)
+- [Modelisation mathematique](docs/02_modelisation_mathematique.md)
+- [Resolution et assouplissements](docs/04_resolution_et_assouplissements.md)
+- [Validation de solution](docs/05_validation_solution.md)
+- [Format des exports](docs/06_format_exports.md)
+- [Visualisation cartographique](docs/07_visualisation_cartographique.md)
+- [Preparation des donnees reelles](docs/08_preparation_donnees.md)
+- [Modelisation algorithmique complete](docs/09_modelisation_algorithmique_complete.md)
