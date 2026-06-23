@@ -9,7 +9,9 @@ from cc_formation_optimizer.config import ConfigError, load_config
 from cc_formation_optimizer.data_loading import DataLoadingError, load_communes, load_compatibilities, load_travel_times
 from cc_formation_optimizer.model_builder import build_model
 from cc_formation_optimizer.parameters import build_derived_parameters
+from cc_formation_optimizer.solution_extractor import SolutionExtractionError, extract_solution
 from cc_formation_optimizer.solver import solve_model
+from cc_formation_optimizer.validation import SolutionValidationError, validate_solution
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -62,11 +64,22 @@ def main(argv: list[str] | None = None) -> int:
             derived = build_derived_parameters(communes, travel_times, compatibilities, config)
             model_bundle = build_model(derived, config)
             result = solve_model(model_bundle, config)
-        except (DataLoadingError, ValueError) as exc:
+            solution = None
+            validation_report = None
+            if result.status in {"OPTIMAL", "FEASIBLE"}:
+                solution = extract_solution(model_bundle, result, communes, config)
+                validation_report = validate_solution(solution, model_bundle, config)
+        except (DataLoadingError, SolutionExtractionError, SolutionValidationError, ValueError) as exc:
             parser.exit(status=2, message=f"Erreur de donnees ou de modele: {exc}\n")
 
         print(f"Statut: {result.status}")
-        if result.objective_value is not None:
+        if solution is not None and validation_report is not None:
+            print(f"Objectif total: {solution.objective.objectif_total}")
+            print(f"Sessions ouvertes: {len(solution.sessions)}")
+            print(f"Communes affectees: {len(solution.assignments)}")
+            print(f"Total CC: {validation_report.total_cc}")
+            print("Validation: OK")
+        elif result.objective_value is not None:
             print(f"Objectif: {result.objective_value}")
         print(f"Temps solveur: {result.wall_time_seconds:.3f}s")
         return 0

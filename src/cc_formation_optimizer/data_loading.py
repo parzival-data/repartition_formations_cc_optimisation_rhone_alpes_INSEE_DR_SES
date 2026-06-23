@@ -41,8 +41,19 @@ def load_communes(config: OptimizerConfig, base_dir: Path | None = None) -> list
         name = _require_text(row[columns["commune_name"]], columns["commune_name"], row_number)
         population = _parse_non_negative_int(row[columns["population"]], columns["population"], row_number)
         category = _require_text(row[columns["category"]], columns["category"], row_number).upper()
+        territory_ear = _optional_text(row, columns.get("territory_ear"))
+        housing = _optional_non_negative_int(row, columns.get("housing"), row_number)
 
-        communes.append(Commune(commune_id=commune_id, name=name, population=population, category=category))
+        communes.append(
+            Commune(
+                commune_id=commune_id,
+                name=name,
+                population=population,
+                category=category,
+                territory_ear=territory_ear,
+                housing=housing,
+            )
+        )
 
     return communes
 
@@ -155,3 +166,22 @@ def _parse_binary_int(value: Any, field_name: str, row_number: int) -> int:
     if parsed not in (0, 1):
         raise DataLoadingError(f"Le champ {field_name} doit valoir 0 ou 1 a la ligne {row_number}.")
     return parsed
+
+
+def _optional_text(row: dict[str, Any], column_name: str | None) -> str | None:
+    if not column_name or column_name not in row:
+        return None
+    value = row[column_name]
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _optional_non_negative_int(row: dict[str, Any], column_name: str | None, row_number: int) -> int | None:
+    if not column_name or column_name not in row:
+        return None
+    value = row[column_name]
+    if value is None or str(value).strip() == "":
+        return None
+    return _parse_non_negative_int(value, column_name, row_number)

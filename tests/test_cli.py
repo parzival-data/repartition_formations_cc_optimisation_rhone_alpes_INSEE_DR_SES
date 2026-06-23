@@ -10,3 +10,5 @@ def test_solve_command_runs_on_minimal_fixture(capsys) -> None:
 
     assert status_code == 0
     assert "Statut: OPTIMAL" in captured.out or "Statut: FEASIBLE" in captured.out
+    assert "Objectif total:" in captured.out
+    assert "Validation: OK" in captured.out

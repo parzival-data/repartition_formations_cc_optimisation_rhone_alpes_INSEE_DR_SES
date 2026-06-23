@@ -30,7 +30,9 @@ Construire et resoudre le modele CP-SAT minimal :
 cc-formation-optimizer solve --config config/config_ear2027.yaml
 ```
 
-Cette commande charge les CSV configures, construit les parametres derives, genere le modele CP-SAT, lance le solveur et affiche le statut ainsi que la valeur d'objectif si une solution est trouvee. L'assouplissement automatique complet et les exports finaux detailles seront traites dans des etapes ulterieures.
+Cette commande charge les CSV configures, construit les parametres derives, genere le modele CP-SAT, lance le solveur, extrait la solution metier et lance la validation automatique. Elle affiche le statut, l'objectif total recalcule, le nombre de sessions ouvertes, le nombre de communes affectees, le total de CC et le resultat de validation.
+
+L'assouplissement automatique complet et les exports finaux detailles seront traites dans des etapes ulterieures.
 
 ## Organisation
 

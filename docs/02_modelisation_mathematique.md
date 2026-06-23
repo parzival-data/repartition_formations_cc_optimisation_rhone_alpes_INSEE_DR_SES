@@ -69,3 +69,5 @@ Les contraintes suivantes sont implementees dans `model_builder.py` :
 Les variables `x_ijm` ne sont creees que pour les couples `(i,j)` admissibles et compatibles. Un trajet absent de la matrice `tau` ne cree donc aucune variable d'affectation.
 
 La formulation CP-SAT reste lineaire : le cout d'eligibilite utilise `e_j^PC * y_jm + (e_j^TPC - e_j^PC) * z_jm`, et le budget PC utilise `y_jm - z_jm`. Aucun produit entre variables n'est introduit.
+
+Apres resolution, `solution_extractor.py` transforme les valeurs CP-SAT en sessions ouvertes et affectations de communes. `validation.py` recalcule ensuite les contraintes et les composantes d'objectif depuis cette solution metier avant toute exploitation.

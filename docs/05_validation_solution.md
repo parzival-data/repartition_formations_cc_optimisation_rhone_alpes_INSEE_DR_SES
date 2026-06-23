@@ -1,6 +1,8 @@
 # Validation de solution
 
-La validation automatique devra verifier au minimum :
+La validation automatique est implementee dans `validation.py`. Une solution n'est pas exploitable tant qu'elle n'a pas ete extraite puis acceptee par `validate_solution()`.
+
+La validation verifie au minimum :
 
 - chaque commune est affectee exactement une fois ;
 - aucune affectation n'existe vers une formation fermee ;
@@ -10,4 +12,8 @@ La validation automatique devra verifier au minimum :
 - aucune commune PC n'est affectee a une formation declaree TPC ;
 - les valeurs d'objectif exportees correspondent aux affectations.
 
-Ces controles seront executes apres resolution et avant export.
+Les composantes `Obj_trajet`, `Obj_eligibilite`, `Obj_mixite` et l'objectif total sont recalculees depuis la solution extraite, puis comparees a l'objectif retourne par le solveur.
+
+Si une contrainte echoue, `validate_solution()` leve une erreur explicite. Si tout passe, elle retourne un rapport structure indiquant le nombre de sessions, le nombre d'affectations et le nombre total de CC.
+
+Les exports finaux detailles seront ajoutes a l'etape suivante.

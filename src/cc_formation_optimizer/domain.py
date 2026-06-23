@@ -13,6 +13,8 @@ class Commune:
     name: str
     population: int
     category: str
+    territory_ear: str | None = None
+    housing: int | None = None
 
 
 @dataclass(frozen=True)
