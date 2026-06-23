@@ -84,6 +84,13 @@ DEFAULT_CATEGORY_MAPPING = {
     "TPC": "TPC",
 }
 
+DEFAULT_COORDINATE_COLUMNS = {
+    "code_commune": "insee_code",
+    "nom_commune": "name",
+    "latitude": "lat",
+    "longitude": "lon",
+}
+
 CODE_PATTERN = re.compile(r"\(([^()]+)\)\s*$")
 
 
@@ -121,6 +128,7 @@ def prepare_data(
         "transformations": [
             "Codes communes normalises en chaines de caracteres.",
             "Categories converties vers PC/TPC selon le mapping configure.",
+            "Coordonnees jointes aux communes par code commune normalise lorsqu'un fichier est disponible.",
             "Temps de trajet decimaux convertis en minutes entieres par plafond.",
             "Trajets absents conserves absents et traites comme interdits par le modele.",
         ],
@@ -133,6 +141,15 @@ def prepare_data(
         non_blocking_issues,
     )
     stats.update(commune_stats)
+
+    coordinate_stats = _merge_coordinates(
+        communes_rows,
+        resolved_input_dir,
+        preparation_config,
+        blocking_issues,
+        non_blocking_issues,
+    )
+    _merge_nested_stats(stats, coordinate_stats)
 
     commune_ids = {row["code_commune"] for row in communes_rows}
     travel_rows, travel_stats = _prepare_travel_times(
@@ -335,13 +352,6 @@ def _prepare_communes(
             }
         )
 
-    with_coordinates = sum(1 for row in clean_rows if row["latitude"] and row["longitude"])
-    without_coordinates = len(clean_rows) - with_coordinates
-    if without_coordinates:
-        non_blocking_issues.append(
-            PreparationIssue("non_blocking", f"{without_coordinates} communes sans coordonnees latitude/longitude.", file_path.name)
-        )
-
     return clean_rows, {
         "communes_file": file_path.name,
         "communes_rows_raw": max(len(rows) - 1, 0),
@@ -350,10 +360,173 @@ def _prepare_communes(
         "tpc_count": sum(1 for row in clean_rows if row["categorie"] == "TPC"),
         "communes_invalid_rows": invalid_rows,
         "communes_unknown_categories": unknown_categories,
-        "communes_with_coordinates": with_coordinates,
-        "communes_without_coordinates": without_coordinates,
         "columns_renamed": {"communes": raw_columns},
         "columns_ignored": {"communes": ignored},
+    }
+
+
+def _merge_coordinates(
+    commune_rows: list[dict[str, str]],
+    input_dir: Path,
+    preparation_config: dict[str, Any],
+    blocking_issues: list[PreparationIssue],
+    non_blocking_issues: list[PreparationIssue],
+) -> dict[str, Any]:
+    config = dict(preparation_config.get("coordinates", {}))
+    file_path = _select_optional_file(
+        input_dir,
+        config,
+        ["cities_geocoded.ods"],
+        ["*geocod*.csv", "*geocod*.ods", "*coord*.csv", "*coord*.ods"],
+    )
+    commune_ids = {row["code_commune"] for row in commune_rows}
+
+    if file_path is None:
+        missing_codes = [row["code_commune"] for row in commune_rows if not row["latitude"] or not row["longitude"]]
+        if missing_codes:
+            non_blocking_issues.append(
+                PreparationIssue(
+                    "non_blocking",
+                    f"Aucun fichier de coordonnees trouve; {len(missing_codes)} communes sans coordonnees latitude/longitude.",
+                )
+            )
+        return _coordinate_stats_without_file(commune_rows, missing_codes)
+
+    rows = _read_tabular_file(file_path, config.get("sheet"))
+    if not rows:
+        raise DataPreparationError(f"Fichier coordonnees vide: {file_path}.")
+
+    header = _normalize_headers(rows[0])
+    raw_columns = dict(DEFAULT_COORDINATE_COLUMNS)
+    raw_columns.update(config.get("columns", {}))
+    column_indexes = _column_indexes(header)
+    missing_required = [
+        clean
+        for clean in ["code_commune", "latitude", "longitude"]
+        if _normalize_header(raw_columns[clean]) not in column_indexes
+    ]
+    if missing_required:
+        raise DataPreparationError(
+            f"Colonnes coordonnees obligatoires manquantes dans {file_path.name}: {', '.join(missing_required)}."
+        )
+
+    ignored = [
+        column
+        for column in rows[0]
+        if _normalize_header(column) not in {_normalize_header(value) for value in raw_columns.values()}
+    ]
+    coordinates: dict[str, tuple[float, float]] = {}
+    seen_codes: set[str] = set()
+    duplicates = 0
+    invalid = 0
+    outside_scope: list[str] = []
+
+    for row_number, values in enumerate(rows[1:], start=2):
+        if not any(str(value).strip() for value in values):
+            continue
+        row = _row_dict(header, values)
+        code = _normalize_commune_code(_value(row, raw_columns["code_commune"]))
+        if not code:
+            blocking_issues.append(
+                PreparationIssue("blocking", "Code commune vide dans le fichier de coordonnees.", file_path.name, row_number)
+            )
+            invalid += 1
+            continue
+        if code in seen_codes:
+            blocking_issues.append(
+                PreparationIssue("blocking", f"Coordonnees dupliquees pour la commune {code}.", file_path.name, row_number)
+            )
+            duplicates += 1
+            invalid += 1
+            continue
+        seen_codes.add(code)
+
+        latitude = _parse_coordinate(
+            _value(row, raw_columns["latitude"]),
+            "latitude",
+            -90,
+            90,
+            file_path.name,
+            row_number,
+            blocking_issues,
+        )
+        longitude = _parse_coordinate(
+            _value(row, raw_columns["longitude"]),
+            "longitude",
+            -180,
+            180,
+            file_path.name,
+            row_number,
+            blocking_issues,
+        )
+        if latitude is None or longitude is None:
+            invalid += 1
+            continue
+        if code not in commune_ids:
+            outside_scope.append(code)
+            continue
+        coordinates[code] = (latitude, longitude)
+
+    if outside_scope:
+        non_blocking_issues.append(
+            PreparationIssue(
+                "non_blocking",
+                f"{len(outside_scope)} coordonnees hors perimetre EAR2027 ignorees.",
+                file_path.name,
+            )
+        )
+
+    for row in commune_rows:
+        coordinate = coordinates.get(row["code_commune"])
+        if coordinate is None:
+            continue
+        row["latitude"] = str(coordinate[0])
+        row["longitude"] = str(coordinate[1])
+
+    missing_codes = [row["code_commune"] for row in commune_rows if not row["latitude"] or not row["longitude"]]
+    if missing_codes:
+        non_blocking_issues.append(
+            PreparationIssue(
+                "non_blocking",
+                f"{len(missing_codes)} communes sans coordonnees apres jointure.",
+                file_path.name,
+            )
+        )
+
+    return {
+        "coordinates_file": file_path.name,
+        "coordinates_sheet": config.get("sheet"),
+        "coordinates_columns": raw_columns,
+        "coordinates_crs": config.get("crs", "non precise"),
+        "coordinates_rows_raw": max(len(rows) - 1, 0),
+        "coordinates_valid": len(coordinates),
+        "coordinates_invalid": invalid,
+        "coordinates_duplicates": duplicates,
+        "coordinates_outside_scope": len(outside_scope),
+        "coordinates_outside_scope_codes": outside_scope[:50],
+        "communes_with_coordinates": sum(1 for row in commune_rows if row["latitude"] and row["longitude"]),
+        "communes_without_coordinates": len(missing_codes),
+        "communes_without_coordinates_codes": missing_codes[:50],
+        "columns_renamed": {"coordinates": raw_columns},
+        "columns_ignored": {"coordinates": ignored},
+    }
+
+
+def _coordinate_stats_without_file(commune_rows: list[dict[str, str]], missing_codes: list[str]) -> dict[str, Any]:
+    return {
+        "coordinates_file": None,
+        "coordinates_sheet": None,
+        "coordinates_columns": {},
+        "coordinates_crs": "non precise",
+        "coordinates_rows_raw": 0,
+        "coordinates_valid": 0,
+        "coordinates_invalid": 0,
+        "coordinates_duplicates": 0,
+        "coordinates_outside_scope": 0,
+        "coordinates_outside_scope_codes": [],
+        "communes_with_coordinates": sum(1 for row in commune_rows if row["latitude"] and row["longitude"]),
+        "communes_without_coordinates": len(missing_codes),
+        "communes_without_coordinates_codes": missing_codes[:50],
     }
 
 
@@ -591,6 +764,26 @@ def _select_file(input_dir: Path, config: dict[str, Any], defaults: list[str], l
     raise DataPreparationError(f"Aucun fichier {label} trouve dans {input_dir}: {', '.join(defaults)}.")
 
 
+def _select_optional_file(
+    input_dir: Path,
+    config: dict[str, Any],
+    defaults: list[str],
+    patterns: list[str],
+) -> Path | None:
+    configured = config.get("file")
+    if configured:
+        path = input_dir / str(configured)
+        return path if path.exists() else None
+    for name in defaults:
+        path = input_dir / name
+        if path.exists():
+            return path
+    matches: list[Path] = []
+    for pattern in patterns:
+        matches.extend(sorted(input_dir.glob(pattern)))
+    return matches[0] if matches else None
+
+
 def _read_tabular_file(path: Path, sheet_name: str | None = None) -> list[list[str]]:
     suffix = path.suffix.lower()
     if suffix == ".csv":
@@ -762,6 +955,47 @@ def _parse_optional_float(
         return None
 
 
+def _parse_coordinate(
+    value: Any,
+    field_name: str,
+    lower_bound: float,
+    upper_bound: float,
+    file_name: str,
+    row_number: int,
+    blocking_issues: list[PreparationIssue],
+) -> float | None:
+    text = str(value).strip().replace(",", ".")
+    if not text:
+        blocking_issues.append(PreparationIssue("blocking", f"Coordonnee vide pour {field_name}.", file_name, row_number))
+        return None
+    try:
+        parsed = float(text)
+    except ValueError:
+        blocking_issues.append(
+            PreparationIssue("blocking", f"Coordonnee numerique invalide pour {field_name}: {text}.", file_name, row_number)
+        )
+        return None
+    if parsed < lower_bound or parsed > upper_bound:
+        blocking_issues.append(
+            PreparationIssue(
+                "blocking",
+                f"Coordonnee hors plage pour {field_name}: {text} (attendu {lower_bound}..{upper_bound}).",
+                file_name,
+                row_number,
+            )
+        )
+        return None
+    return parsed
+
+
+def _merge_nested_stats(target: dict[str, Any], incoming: dict[str, Any]) -> None:
+    for key, value in incoming.items():
+        if key in {"columns_renamed", "columns_ignored"} and isinstance(value, dict):
+            target.setdefault(key, {}).update(value)
+        else:
+            target[key] = value
+
+
 def _write_csv(path: Path, fieldnames: list[str], rows: list[dict[str, str]]) -> None:
     with path.open("w", encoding="utf-8", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=fieldnames)
@@ -796,11 +1030,26 @@ def _write_report(path: Path, result: PreparationResult) -> None:
         f"- Trajets invalides rejetes : {stats.get('travel_times_invalid_rejected', 0)}",
         f"- Doublons detectes : {stats.get('travel_times_duplicates', 0)}",
         f"- Compatibilites chargees : {'oui' if stats.get('compatibilities_loaded') else 'non'}",
+        f"- Fichier de coordonnees utilise : {stats.get('coordinates_file') or 'aucun'}",
+        f"- Coordonnees lues : {stats.get('coordinates_rows_raw', 0)}",
+        f"- Coordonnees valides jointes : {stats.get('coordinates_valid', 0)}",
+        f"- Coordonnees invalides : {stats.get('coordinates_invalid', 0)}",
+        f"- Coordonnees hors perimetre : {stats.get('coordinates_outside_scope', 0)}",
         "",
         "## Colonnes",
         "",
         f"- Colonnes renommees : `{json.dumps(stats.get('columns_renamed', {}), ensure_ascii=False)}`",
         f"- Colonnes ignorees : `{json.dumps(stats.get('columns_ignored', {}), ensure_ascii=False)}`",
+        f"- Colonnes de jointure coordonnees : `{json.dumps(stats.get('coordinates_columns', {}), ensure_ascii=False)}`",
+        f"- Systeme de coordonnees declare : {stats.get('coordinates_crs', 'non precise')}",
+        "",
+        "## Communes sans coordonnees",
+        "",
+        _format_code_sample(stats.get("communes_without_coordinates_codes", [])),
+        "",
+        "## Coordonnees hors perimetre",
+        "",
+        _format_code_sample(stats.get("coordinates_outside_scope_codes", [])),
         "",
         "## Anomalies bloquantes",
         "",
@@ -825,6 +1074,13 @@ def _format_issues(issues: tuple[PreparationIssue, ...]) -> list[str]:
     if not issues:
         return ["- Aucune."]
     return [f"- {issue.message}" for issue in issues]
+
+
+def _format_code_sample(codes: list[str]) -> str:
+    if not codes:
+        return "- Aucune."
+    suffix = "..." if len(codes) >= 50 else ""
+    return "- " + ", ".join(codes) + suffix
 
 
 def _issue_to_dict(issue: PreparationIssue) -> dict[str, Any]:

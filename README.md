@@ -36,6 +36,11 @@ dans `config/config_ear2027.yaml`, produit les CSV propres dans
 `--dry-run` pour analyser sans ecrire et `--strict` pour echouer en presence
 d'anomalies bloquantes.
 
+Le fichier de coordonnees `cities_geocoded.ods` est joint aux communes par code
+INSEE normalise. Les coordonnees sont utiles a la carte HTML, mais elles ne
+modifient pas l'optimisation ; une commune sans coordonnees reste affectee et
+apparait dans les exports non cartographiques.
+
 Verifier les donnees preparees sans lancer de resolution longue :
 
 ```bash

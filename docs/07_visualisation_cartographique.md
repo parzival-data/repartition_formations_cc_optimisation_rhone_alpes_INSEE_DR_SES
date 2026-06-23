@@ -45,6 +45,12 @@ La carte depend des champs optionnels `latitude` et `longitude` dans les donnees
 
 Si aucune commune n'a de coordonnees, le HTML est tout de meme produit avec un message clair et les controles metier restent consultables.
 
+Les coordonnees sont ajoutees pendant la preparation des donnees, par jointure
+entre les communes et le fichier configure dans `data_preparation.coordinates`
+du YAML. Le fichier actuel est `cities_geocoded.ods` avec les colonnes
+`insee_code`, `lat` et `lon`. Elles ne changent pas le modele d'optimisation :
+elles servent uniquement a positionner les points dans l'export HTML.
+
 ## Fond de carte
 
 Le HTML est autonome et les points restent visibles sans fond externe. Un fond IGN/Geoplateforme pourra etre ajoute ou active ulterieurement si l'environnement d'utilisation autorise l'acces reseau, par exemple via les tuiles WMTS `https://data.geopf.fr/wmts`.

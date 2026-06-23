@@ -61,6 +61,25 @@ Le fichier propre attendu contient :
 Les trajets absents dans les matrices brutes ne sont jamais completes
 artificiellement.
 
+## Coordonnees
+
+Un fichier de coordonnees peut etre fourni dans le dossier brut. La
+configuration actuelle utilise `cities_geocoded.ods`, feuille `cities`, avec :
+
+- `insee_code` pour le code commune ;
+- `lat` pour la latitude ;
+- `lon` pour la longitude ;
+- `name` comme nom de commune informatif si disponible.
+
+La jointure se fait sur le code commune normalise. Les coordonnees doivent etre
+des latitudes/longitudes numeriques dans les plages `-90..90` et `-180..180`.
+Si le systeme de coordonnees n'est pas precise par le fichier source, aucune
+conversion n'est tentee automatiquement.
+
+Les coordonnees sont optionnelles pour l'optimisation. Elles sont necessaires
+pour afficher les communes sur la carte ; les communes sans coordonnees restent
+dans les exports et dans la solution, mais ne sont pas dessinees sur la carte.
+
 ## Compatibilites
 
 Le fichier de compatibilite permet d'imposer `b_ij = 0` pour des regroupements juges incoherents. En l'absence de fichier ou de ligne specifique, la compatibilite par defaut sera `1`.

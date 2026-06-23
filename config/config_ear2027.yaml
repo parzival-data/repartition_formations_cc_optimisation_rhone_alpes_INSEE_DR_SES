@@ -26,6 +26,15 @@ columns:
 data_preparation:
   input_dir: donnee_brut_EAR27
   output_dir: data/processed
+  raw_files:
+    input_dir: donnee_brut_EAR27
+    communes_file: info_minimum.ods
+    travel_times_file: matrice_temps_trajets_max_90min.ods
+    coordinates_file: cities_geocoded.ods
+  raw_columns:
+    coordinate_commune_id: insee_code
+    latitude: lat
+    longitude: lon
   communes:
     file: info_minimum.ods
     sheet: Feuille1
@@ -48,6 +57,16 @@ data_preparation:
     format: wide_matrix
     origin_column: origin
     output: data/processed/temps_trajet_clean.csv
+  coordinates:
+    file: cities_geocoded.ods
+    sheet: cities
+    crs: non precise dans le fichier source; colonnes conservees sans conversion
+    columns:
+      code_commune: insee_code
+      nom_commune: name
+      latitude: lat
+      longitude: lon
+    output: data/processed/communes_clean.csv
   compatibilities:
     file:
     output: data/processed/compatibilites_clean.csv

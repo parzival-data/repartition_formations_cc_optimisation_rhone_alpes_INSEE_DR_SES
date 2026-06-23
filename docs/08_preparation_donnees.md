@@ -26,6 +26,7 @@ Le dossier brut inspecte contient :
 - `matrice_temps_trajets_max_60min.ods` : matrice large filtree.
 - `matrice_temps_trajets_max_90min.ods` : matrice large filtree utilisee par defaut avec `T=90`.
 - `matrice_temps_trajets_max_120min.ods` : matrice large filtree.
+- `cities_geocoded.ods` : coordonnees latitude/longitude des communes.
 
 Aucun fichier de compatibilites n'a ete detecte. Cette absence n'est pas
 bloquante : le modele interprete les compatibilites absentes comme `b_ij = 1`.
@@ -39,10 +40,41 @@ colonnes brutes et les sorties :
 - `communes.columns` mappe les noms bruts vers les champs propres.
 - `communes.category_mapping` convertit les categories brutes vers `PC` ou `TPC`.
 - `travel_times.file` et `travel_times.sheet` selectionnent la matrice de temps.
+- `coordinates.file` et `coordinates.sheet` selectionnent le fichier de coordonnees.
+- `coordinates.columns` mappe le code commune, la latitude, la longitude et le nom informatif.
 - `compatibilities.file` peut etre renseigne si un fichier de compatibilites est ajoute.
 
 Les noms de colonnes brutes peuvent changer tant que le mapping YAML est mis a
 jour et que les transformations restent documentees.
+
+Si `coordinates.file` n'est pas renseigne, le workflow cherche d'abord
+`cities_geocoded.ods`, puis les fichiers dont le nom contient `geocod` ou
+`coord`. Cette detection automatique est une aide ; le YAML reste la source de
+verite recommandee pour un jeu de donnees reel.
+
+## Coordonnees
+
+Le fichier de coordonnees actuel contient les colonnes :
+
+- `insee_code` : code commune utilise pour la jointure ;
+- `name` : nom de commune informatif ;
+- `lat` : latitude ;
+- `lon` : longitude ;
+- `coord_source`, `geocode_status` et autres colonnes de controle ignorees par le solveur.
+
+La jointure est faite apres nettoyage des communes, sur le code commune
+normalise. Les controles appliques sont :
+
+- code commune non vide ;
+- unicite des codes dans le fichier de coordonnees ;
+- latitude et longitude numeriques ;
+- latitude comprise entre `-90` et `90` ;
+- longitude comprise entre `-180` et `180` ;
+- signalement des coordonnees hors perimetre EAR2027.
+
+Le fichier source ne declare pas explicitement de systeme de coordonnees. Les
+colonnes `lat`/`lon` sont conservees sans conversion. Une conversion ne doit
+etre ajoutee que si le systeme source est documente.
 
 ## Sorties
 
@@ -55,7 +87,10 @@ La preparation produit :
 - `outputs/reports/statistiques_preparation_donnees.json` avec `--report`.
 
 Le rapport indique les fichiers lus, les colonnes renommees, les colonnes
-ignorees, les volumes, les anomalies et les transformations realisees.
+ignorees, les volumes, les anomalies et les transformations realisees. Il
+inclut aussi le fichier de coordonnees utilise, les colonnes de jointure, le
+nombre de coordonnees lues, valides, invalides, hors perimetre et les communes
+encore sans coordonnees.
 
 ## Controles
 
@@ -65,6 +100,9 @@ Anomalies bloquantes :
 - doublon de commune ;
 - categorie inconnue ;
 - population ou logements non numeriques ou negatifs ;
+- latitude ou longitude non numerique ;
+- latitude ou longitude hors plage ;
+- doublon de code commune dans le fichier de coordonnees ;
 - origine ou pivot de trajet vide ;
 - origine ou pivot absent du fichier communes ;
 - temps de trajet non numerique ou negatif ;
@@ -75,6 +113,7 @@ Anomalies non bloquantes :
 
 - colonnes latitude/longitude absentes ;
 - communes sans coordonnees ;
+- coordonnees hors perimetre EAR2027 ;
 - fichier de compatibilites absent ;
 - matrice de trajets asymetrique ;
 - trajets absents.

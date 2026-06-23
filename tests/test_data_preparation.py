@@ -6,12 +6,36 @@ from pathlib import Path
 
 import pytest
 
+from cc_formation_optimizer.config import load_config
+from cc_formation_optimizer.data_loading import load_communes, load_compatibilities, load_travel_times
 from cc_formation_optimizer.data_preparation import DataPreparationError, prepare_data
+from cc_formation_optimizer.map_export import export_solution_map
+from cc_formation_optimizer.model_builder import build_model
+from cc_formation_optimizer.parameters import build_derived_parameters
+from cc_formation_optimizer.solution_extractor import extract_solution
+from cc_formation_optimizer.solver import solve_model
+from cc_formation_optimizer.validation import validate_solution
 
 
-def _write_config(tmp_path: Path, communes_file: str = "communes_raw.csv", travel_file: str = "trajets_raw.csv") -> Path:
+def _write_config(
+    tmp_path: Path,
+    communes_file: str = "communes_raw.csv",
+    travel_file: str = "trajets_raw.csv",
+    coordinates_file: str | None = None,
+) -> Path:
     config_path = tmp_path / "config_prepare.yaml"
     output_root = str(tmp_path / "outputs").replace("\\", "/")
+    coordinates_section = ""
+    if coordinates_file is not None:
+        coordinates_section = f"""
+  coordinates:
+    file: {coordinates_file}
+    columns:
+      code_commune: insee
+      nom_commune: nom
+      latitude: lat
+      longitude: lon
+"""
     config_path.write_text(
         f"""
 metadata:
@@ -38,6 +62,7 @@ data_preparation:
     origin_column: origine
     destination_column: pivot
     minutes_column: duree
+{coordinates_section}
 """,
         encoding="utf-8",
     )
@@ -57,6 +82,13 @@ def _write_communes(raw_dir: Path, rows: list[dict[str, str]]) -> None:
 def _write_travels(raw_dir: Path, rows: list[dict[str, str]]) -> None:
     with (raw_dir / "trajets_raw.csv").open("w", encoding="utf-8", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=["origine", "pivot", "duree"])
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def _write_coordinates(raw_dir: Path, rows: list[dict[str, str]]) -> None:
+    with (raw_dir / "coords_raw.csv").open("w", encoding="utf-8", newline="") as stream:
+        writer = csv.DictWriter(stream, fieldnames=["insee", "nom", "lat", "lon"])
         writer.writeheader()
         writer.writerows(rows)
 
@@ -117,6 +149,119 @@ def test_communes_raw_file_is_transformed_to_clean_csv(tmp_path: Path) -> None:
     assert rows[1]["categorie"] == "TPC"
     assert rows[1]["latitude"] == ""
     assert result.stats["communes_without_coordinates"] == 1
+
+
+def test_coordinates_file_is_joined_to_clean_communes_with_normalized_codes(tmp_path: Path) -> None:
+    config_path, raw_dir, output_dir = _prepare_fixture(tmp_path)
+    _write_coordinates(
+        raw_dir,
+        [
+            {"insee": "00001", "nom": "Commune PC", "lat": "45.11", "lon": "4.22"},
+            {"insee": "2", "nom": "Commune TPC", "lat": "45,33", "lon": "4,44"},
+        ],
+    )
+    config_path = _write_config(tmp_path, coordinates_file="coords_raw.csv")
+
+    result = prepare_data(config_path, input_dir=raw_dir, output_dir=output_dir)
+
+    rows = list(csv.DictReader((output_dir / "communes_clean.csv").open(encoding="utf-8")))
+    assert rows[0]["latitude"] == "45.11"
+    assert rows[0]["longitude"] == "4.22"
+    assert rows[1]["latitude"] == "45.33"
+    assert rows[1]["longitude"] == "4.44"
+    assert result.stats["communes_with_coordinates"] == 2
+    assert result.stats["communes_without_coordinates"] == 0
+
+
+def test_commune_without_coordinates_is_accepted_after_join(tmp_path: Path) -> None:
+    config_path, raw_dir, output_dir = _prepare_fixture(tmp_path)
+    _write_coordinates(raw_dir, [{"insee": "1", "nom": "Commune PC", "lat": "45.11", "lon": "4.22"}])
+    config_path = _write_config(tmp_path, coordinates_file="coords_raw.csv")
+
+    result = prepare_data(config_path, input_dir=raw_dir, output_dir=output_dir)
+
+    rows = list(csv.DictReader((output_dir / "communes_clean.csv").open(encoding="utf-8")))
+    assert rows[1]["latitude"] == ""
+    assert result.stats["communes_with_coordinates"] == 1
+    assert result.stats["communes_without_coordinates"] == 1
+    assert result.blocking_issues == ()
+
+
+def test_invalid_latitude_longitude_duplicate_and_outside_scope_are_reported(tmp_path: Path) -> None:
+    config_path, raw_dir, output_dir = _prepare_fixture(tmp_path)
+    _write_coordinates(
+        raw_dir,
+        [
+            {"insee": "1", "nom": "Commune PC", "lat": "91", "lon": "4.22"},
+            {"insee": "2", "nom": "Commune TPC", "lat": "45.33", "lon": "181"},
+            {"insee": "2", "nom": "Commune TPC duplicate", "lat": "45.34", "lon": "4.44"},
+            {"insee": "99999", "nom": "Hors perimetre", "lat": "45.0", "lon": "4.0"},
+        ],
+    )
+    config_path = _write_config(tmp_path, coordinates_file="coords_raw.csv")
+
+    result = prepare_data(config_path, input_dir=raw_dir, output_dir=output_dir)
+
+    blocking = [issue.message for issue in result.blocking_issues]
+    non_blocking = [issue.message for issue in result.non_blocking_issues]
+    assert any("latitude" in message and "hors plage" in message for message in blocking)
+    assert any("longitude" in message and "hors plage" in message for message in blocking)
+    assert any("Coordonnees dupliquees" in message for message in blocking)
+    assert any("hors perimetre" in message for message in non_blocking)
+    assert result.stats["coordinates_outside_scope"] == 1
+
+
+def test_coordinate_report_and_stats_are_generated(tmp_path: Path) -> None:
+    config_path, raw_dir, output_dir = _prepare_fixture(tmp_path)
+    _write_coordinates(raw_dir, [{"insee": "1", "nom": "Commune PC", "lat": "45.11", "lon": "4.22"}])
+    config_path = _write_config(tmp_path, coordinates_file="coords_raw.csv")
+
+    prepare_data(config_path, input_dir=raw_dir, output_dir=output_dir, report=True)
+
+    report_path = tmp_path / "outputs" / "reports" / "rapport_preparation_donnees.md"
+    stats_path = tmp_path / "outputs" / "reports" / "statistiques_preparation_donnees.json"
+    report = report_path.read_text(encoding="utf-8").lower()
+    stats = json.loads(stats_path.read_text(encoding="utf-8"))
+    assert "coordonnees" in report
+    assert stats["communes_with_coordinates"] == 1
+    assert stats["communes_without_coordinates"] == 1
+    assert stats["coordinates_valid"] == 1
+
+
+def test_prepared_coordinates_can_feed_map_export(tmp_path: Path) -> None:
+    config_path, raw_dir, output_dir = _prepare_fixture(tmp_path)
+    _write_coordinates(
+        raw_dir,
+        [
+            {"insee": "1", "nom": "Commune PC", "lat": "45.11", "lon": "4.22"},
+            {"insee": "2", "nom": "Commune TPC", "lat": "45.33", "lon": "4.44"},
+        ],
+    )
+    prepare_config = _write_config(tmp_path, coordinates_file="coords_raw.csv")
+    prepare_data(prepare_config, input_dir=raw_dir, output_dir=output_dir)
+
+    fixture_config = Path("tests/fixtures/config_minimal.yaml").read_text(encoding="utf-8")
+    fixture_config = fixture_config.replace("tests/fixtures/communes_minimal.csv", str(output_dir / "communes_clean.csv").replace("\\", "/"))
+    fixture_config = fixture_config.replace("tests/fixtures/temps_trajet_minimal.csv", str(output_dir / "temps_trajet_clean.csv").replace("\\", "/"))
+    fixture_config = fixture_config.replace("origin_id: commune_origine", "origin_id: code_commune_origine")
+    fixture_config = fixture_config.replace("destination_id: commune_destination", "destination_id: code_commune_pivot")
+    solver_config = tmp_path / "config_solver.yaml"
+    solver_config.write_text(fixture_config, encoding="utf-8")
+
+    config = load_config(solver_config)
+    communes = load_communes(config)
+    travel_times = load_travel_times(config)
+    compatibilities = load_compatibilities(config)
+    derived = build_derived_parameters(communes, travel_times, compatibilities, config)
+    bundle = build_model(derived, config)
+    solver_result = solve_model(bundle, config)
+    solution = extract_solution(bundle, solver_result, communes, config)
+    validation = validate_solution(solution, bundle, config)
+
+    map_result = export_solution_map(solution, validation, bundle, config, communes, tmp_path / "map_outputs")
+
+    assert map_result.mapped_points == 2
+    assert map_result.missing_coordinates == 0
 
 
 def test_unknown_category_and_duplicate_communes_are_reported(tmp_path: Path) -> None:

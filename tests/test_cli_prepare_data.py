@@ -25,6 +25,12 @@ def test_prepare_data_command_generates_outputs(tmp_path: Path, capsys) -> None:
         writer.writerow({"origine": "1", "pivot": "2", "duree": "12"})
         writer.writerow({"origine": "2", "pivot": "1", "duree": "12"})
 
+    with (raw_dir / "coords_raw.csv").open("w", encoding="utf-8", newline="") as stream:
+        writer = csv.DictWriter(stream, fieldnames=["insee", "lat", "lon"])
+        writer.writeheader()
+        writer.writerow({"insee": "1", "lat": "45.1", "lon": "4.2"})
+        writer.writerow({"insee": "2", "lat": "45.3", "lon": "4.4"})
+
     config_path = tmp_path / "config_prepare.yaml"
     report_root_text = str(report_root).replace("\\", "/")
     config_path.write_text(
@@ -44,6 +50,12 @@ data_preparation:
     origin_column: origine
     destination_column: pivot
     minutes_column: duree
+  coordinates:
+    file: coords_raw.csv
+    columns:
+      code_commune: insee
+      latitude: lat
+      longitude: lon
 """,
         encoding="utf-8",
     )
@@ -67,3 +79,5 @@ data_preparation:
     assert (output_dir / "communes_clean.csv").exists()
     assert (output_dir / "temps_trajet_clean.csv").exists()
     assert (report_root / "reports" / "rapport_preparation_donnees.md").exists()
+    rows = list(csv.DictReader((output_dir / "communes_clean.csv").open(encoding="utf-8")))
+    assert rows[0]["latitude"] == "45.1"
