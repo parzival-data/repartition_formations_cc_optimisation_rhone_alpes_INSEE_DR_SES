@@ -112,7 +112,7 @@ parameters:
         e_TPC: 500
 
 solver:
-  time_limit_seconds: 1200
+  time_limit_seconds: 2400
   num_workers: 8
   random_seed: 1
   log_search_progress: true

@@ -38,7 +38,7 @@ def test_main_config_is_valid() -> None:
     assert config.parameters.T == 75
     assert config.parameters.Q == 14
     assert config.parameters.L == 6
-    assert config.solver["time_limit_seconds"] == 1200
+    assert config.solver["time_limit_seconds"] == 2400
 
 
 def test_rejects_budget_inconsistent_with_model(tmp_path: Path) -> None:
