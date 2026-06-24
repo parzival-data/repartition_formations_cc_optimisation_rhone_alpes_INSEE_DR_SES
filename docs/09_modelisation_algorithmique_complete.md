@@ -1,703 +1,753 @@
 # Modelisation algorithmique complete
 
-Ce document decrit l'algorithme implemente dans le projet pour construire, resoudre, valider, exporter et visualiser une solution de repartition des formations CC EAR 2027.
+## 1. Finalite du document
 
-Il decrit l'etat actuel du code. Les contraintes du modele sont des contraintes dures, les termes de l'objectif sont des penalites optimisees, les diagnostics sont des alertes avant resolution, et la carte est une visualisation des exports.
+Ce document decrit l'algorithme complet utilise par l'outil d'optimisation des
+sessions de formation des coordonnateurs communaux PC/TPC pour l'EAR 2027. Il
+sert de reference pour comprendre le lien entre les donnees d'entree, la
+construction du modele CP-SAT, la resolution, la validation et les exports.
 
-## Notes de coherence avec l'implementation
+Le texte decrit l'etat reel du code. Une regle, une contrainte ou un workflow
+n'est presente comme existant que s'il est effectivement implemente. Les
+extensions non codees sont signalees comme limites ou perspectives.
 
-Deux points doivent etre lus explicitement avant d'utiliser ce document comme reference operationnelle :
+Trois niveaux doivent etre distingues pendant toute la lecture :
 
-- la preparation des donnees interdit un trajet absent. Elle ne cree pas automatiquement les trajets diagonaux \(i \rightarrow i\). Si ces trajets doivent etre admissibles avec un cout nul, ils doivent exister dans les donnees propres de temps de trajet ;
-- l'export CSV `communes_affectees.csv` calcule `is_pivot` comme \(code\_commune = code\_pivot\), tandis que la carte identifie les pivots comme les communes qui hebergent au moins une session ouverte. Ces deux lectures peuvent differer lorsqu'une commune pivot n'est pas affectee a sa propre session.
+- les contraintes dures, qui definissent la faisabilite mathematique ;
+- les penalites de l'objectif, qui orientent le choix entre solutions faisables ;
+- les controles de diagnostic, de validation, d'export et de carte, qui aident a
+  qualifier une solution mais ne remplacent pas l'expertise metier.
 
-## 1. Objectif du probleme
+## 2. Vue d'ensemble du pipeline
 
-Le probleme consiste a organiser les sessions de formation des coordonnateurs communaux PC/TPC pour l'EAR 2027.
-
-L'algorithme doit :
-
-- affecter chaque commune a une seule session de formation ;
-- choisir les communes pivots qui hebergent des sessions ;
-- respecter les capacites minimales et maximales des sessions ;
-- respecter les budgets de sessions PC et TPC ;
-- interdire l'affectation d'une commune PC vers une session TPC ;
-- tenir compte des temps de trajet et des compatibilites ;
-- produire une solution validee, exportable et cartographiable.
-
-La solution recherchee est donc une affectation faisable au sens des contraintes, puis la meilleure possible selon une fonction objectif ponderee.
-
-## 2. Chaine algorithmique globale
-
-Le pipeline complet est :
-
-\[
-\text{Donnees brutes}
-\rightarrow
-\text{Preparation}
-\rightarrow
-\text{Parametres}
-\rightarrow
-\text{Diagnostic}
-\rightarrow
-\text{Modele CP-SAT}
-\rightarrow
-\text{Resolution}
-\rightarrow
-\text{Extraction}
-\rightarrow
-\text{Validation}
-\rightarrow
-\text{Exports}
-\rightarrow
-\text{Carte}
-\]
-
-La preparation transforme les fichiers metier en tables propres. La construction des parametres convertit ces tables en ensembles, constantes et relations admissibles. Le diagnostic verifie les incoherences evidentes avant d'appeler le solveur. Le modele CP-SAT encode les contraintes et l'objectif. La resolution produit des valeurs de variables. L'extraction reconstruit les tables metier. La validation recalcule les contraintes independamment du solveur. Les exports et la carte restituent la solution.
+Le pipeline applique par le projet suit une chaine volontairement separee en
+etapes. Chaque etape produit des objets ou fichiers reutilisables par l'etape
+suivante, ce qui rend le calcul plus controlable et facilite l'audit.
 
 ```text
-Algorithme principal
-Entree : configuration YAML, fichiers communes, temps de trajet,
-         compatibilites optionnelles
-Sortie : solution validee, exports, carte
-
-1. Charger la configuration
-2. Preparer ou charger les donnees propres
-3. Construire les ensembles et parametres
-4. Realiser le diagnostic pre-resolution
-5. Construire le modele CP-SAT
-6. Resoudre
-7. Si solution faisable :
-      extraire la solution
-      valider la solution
-      exporter les resultats
-   Sinon :
-      eventuellement lancer l'assouplissement hierarchique
+Donnees brutes
+-> donnees preparees
+-> parametres derives
+-> diagnostic pre-resolution
+-> modele CP-SAT
+-> resolution
+-> extraction de solution
+-> validation
+-> exports
+-> carte HTML
 ```
 
-## 3. Donnees et ensembles
+En pratique, la sequence operationnelle est la suivante :
 
-On note :
+```text
+1. Charger la configuration YAML.
+2. Preparer les donnees brutes si necessaire.
+3. Charger les CSV propres.
+4. Construire les ensembles, couts et relations admissibles.
+5. Executer les diagnostics pre-resolution.
+6. Construire le modele CP-SAT.
+7. Resoudre le modele.
+8. Si le solveur trouve une solution :
+      extraire la solution metier ;
+      valider la solution extraite ;
+      produire les exports et, si demande, la carte.
+   Sinon :
+      analyser le statut solveur ou utiliser le workflow d'assouplissement.
+```
 
-\[
-C : \text{ensemble des communes}
-\]
+Cette separation est importante : le solveur manipule des variables CP-SAT,
+tandis que les exports manipulent une solution metier reconstruite et validee.
+Les fichiers de restitution ne sont donc pas la source initiale de validation ;
+ils sont produits apres la validation.
 
-\[
-P \subset C : \text{ensemble des communes PC}
-\]
+## 3. Donnees d'entree et preparation
 
-\[
-\mathcal{T} \subset C : \text{ensemble des communes TPC}
-\]
+Le solveur ne lit pas directement les fichiers bruts. Les donnees reelles sont
+d'abord preparees par la commande `prepare-data`, qui transforme les fichiers
+source en tables propres exploitees par les modules de chargement.
 
-\[
-C = P \cup \mathcal{T},
+Le fichier des communes fournit les identifiants INSEE, les noms, la population,
+la categorie `PC` ou `TPC`, et des champs optionnels comme le territoire EAR, le
+nombre de logements, la latitude et la longitude. Ces donnees permettent de
+calculer le nombre de coordonnateurs communaux a former et de connaitre la
+categorie metier de chaque commune.
+
+Le fichier des temps de trajet fournit des temps orientes entre une commune
+origine et une commune candidate pivot. Un trajet absent est traite comme
+interdit : il ne cree pas de variable d'affectation. La preparation ne complete
+pas automatiquement les trajets diagonaux `i -> i`; si un trajet diagonal doit
+etre admissible avec un temps nul, il doit etre present dans les donnees propres.
+
+Le fichier de coordonnees est optionnel pour l'optimisation. Lorsqu'il est
+present, ses latitudes et longitudes sont jointes aux communes et servent a la
+carte HTML. Une commune sans coordonnees peut tout de meme etre affectee et
+apparaitre dans les exports non cartographiques.
+
+Le fichier de compatibilites est egalement optionnel. S'il est absent, le code
+considere que toutes les compatibilites metier valent `1` par defaut. S'il est
+present, il permet d'interdire certains couples commune-pivot avant meme la
+creation des variables d'affectation.
+
+Les principales sorties de preparation sont :
+
+- `data/processed/communes_clean.csv` ;
+- `data/processed/temps_trajet_clean.csv` ;
+- `data/processed/compatibilites_clean.csv` si une source de compatibilites est
+  disponible.
+
+## 4. Ensembles du modele
+
+On note d'abord l'ensemble des communes a affecter :
+
+$$
+C = \text{ensemble des communes a affecter}
+$$
+
+Cet ensemble contient toutes les communes chargees depuis le fichier propre des
+communes.
+
+Les communes PC et TPC forment deux sous-ensembles de `C` :
+
+$$
+P \subset C
+$$
+
+$$
+T \subset C
+$$
+
+Le code suppose que chaque commune appartient a une seule categorie :
+
+$$
+C = P \cup T
 \qquad
-P \cap \mathcal{T} = \varnothing
-\]
+P \cap T = \varnothing
+$$
 
-Dans le code, l'ensemble TPC est nomme `T`. Dans ce document, il est note \(\mathcal{T}\) pour eviter la confusion avec le seuil de temps de trajet \(T\) defini dans la configuration.
+Ici, `T` designe l'ensemble des communes TPC. Il ne faut pas le confondre avec
+le parametre de temps maximal, egalement note `T` dans la configuration. Le
+contexte indique toujours s'il s'agit d'un ensemble ou du seuil de trajet.
 
-Toutes les communes peuvent etre candidates pivot :
+Toutes les communes sont candidates pivot :
 
-\[
+$$
 F = C
-\]
+$$
 
-Les sessions candidates sont indexees par une commune pivot \(j\) et un numero de session \(m\) :
+Cela signifie que le modele autorise toute commune chargee a heberger une
+session potentielle, sous reserve des autres contraintes et penalites. Cette
+egalite ne signifie pas qu'une commune pivot ouverte est automatiquement membre
+de sa propre session : le modele actuel ne force pas cette auto-affectation.
 
-\[
-S = \{(j,m) : j \in F,\ m \in \{1,\dots,M_j\}\}
-\]
+Les sessions candidates sont indexees par une commune pivot `j` et un rang de
+slot `m` :
 
-avec :
+$$
+S = \{(j,m) : j \in F, m \in \{1,\dots,M_j\}\}
+$$
 
-\[
+Le nombre de slots depend de la categorie de la commune pivot :
+
+$$
 M_j =
 \begin{cases}
-M_{\mathrm{PC}} = 3 & \text{si } j \in P,\\
-M_{\mathrm{TPC}} = 1 & \text{si } j \in \mathcal{T}.
+3 & \text{si } j \in P,\\
+1 & \text{si } j \in T.
 \end{cases}
-\]
+$$
 
-Ainsi, une commune PC peut porter jusqu'a trois sessions candidates, tandis qu'une commune TPC peut porter une seule session candidate.
+Une commune PC peut donc porter jusqu'a trois sessions candidates, tandis qu'une
+commune TPC ne peut porter qu'une session candidate. Ces slots sont seulement
+des possibilites : une session candidate devient reelle uniquement si sa
+variable d'ouverture vaut `1`.
 
-## 4. Parametres metier
+## 5. Parametres metier
 
-Le nombre de coordonnateurs communaux associe a une commune \(i\) est :
+Le nombre de coordonnateurs communaux a former pour une commune `i` depend de
+sa population :
 
-\[
+$$
 q_i =
 \begin{cases}
 1 & \text{si } \operatorname{pop}(i) \leq 5000,\\
 2 & \text{si } \operatorname{pop}(i) > 5000.
 \end{cases}
-\]
+$$
 
-Le temps de trajet de \(i\) vers \(j\) est :
+Cette regle est codee dans `parameters.py` et validee par la configuration. Elle
+permet de raisonner en charge de formation, pas seulement en nombre de communes.
 
-\[
-\tau_{ij} \in \mathbb{R}_+
-\]
+Le temps de trajet de la commune `i` vers le pivot `j` est note :
 
-Un couple commune-pivot est admissible si le trajet existe et ne depasse pas le seuil configure :
+$$
+\tau_{ij} \geq 0
+$$
 
-\[
+Les temps sont orientes : un trajet `i -> j` et un trajet `j -> i` sont deux
+entrees distinctes si les donnees les fournissent.
+
+Le seuil maximal de trajet configure est note `T`. Un couple commune-pivot est
+admissible seulement si le trajet existe et respecte ce seuil :
+
+$$
 a_{ij} =
 \begin{cases}
-1 & \text{si } \tau_{ij} \leq T,\\
-0 & \text{sinon ou si } \tau_{ij} \text{ est absent}.
+1 & \text{si le trajet } i \to j \text{ existe et } \tau_{ij} \leq T,\\
+0 & \text{sinon.}
 \end{cases}
-\]
+$$
 
-La compatibilite externe est :
+Un trajet absent donne donc `a_ij = 0`. Il ne s'agit pas d'une forte penalite :
+le couple est retire du modele d'affectation.
 
-\[
+La compatibilite metier externe est notee :
+
+$$
 b_{ij} \in \{0,1\}
-\]
+$$
 
-Si aucun fichier de compatibilite n'est fourni, l'implementation pose par defaut :
+Si aucun fichier de compatibilite n'est fourni, l'implementation pose :
 
-\[
+$$
 b_{ij}=1
 \qquad
-\forall (i,j) \in C \times F
-\]
+\forall i \in C,\ \forall j \in F
+$$
 
-Les autres parametres metier sont :
+Toutes les compatibilites sont alors autorisees par defaut. Si un fichier est
+fourni, une valeur `0` interdit le couple correspondant.
 
-\[
-T : \text{temps maximal admissible}
-\]
+Les autres parametres metier structurants sont :
 
-\[
-Q : \text{capacite maximale d'une session en nombre de CC}
-\]
+| Parametre | Signification |
+| --- | --- |
+| `T` | temps maximal admissible pour une affectation commune-pivot |
+| `Q` | capacite maximale d'une session, en nombre de CC |
+| `L` | remplissage minimal d'une session ouverte |
+| `f` | budget maximal de sessions PC |
+| `k` | budget maximal de sessions TPC |
+| `B` | budget total declare, avec `B = f + k` |
+| `w_t` | poids du temps de trajet dans l'objectif |
+| `w_e` | poids des couts d'eligibilite dans l'objectif |
+| `w_m` | poids de la mixite residuelle dans l'objectif |
+| `e_j^{PC}` | cout d'eligibilite si le pivot `j` heberge une session PC |
+| `e_j^{TPC}` | cout d'eligibilite si le pivot `j` heberge une session TPC |
 
-\[
-L : \text{remplissage minimal d'une session ouverte}
-\]
+Les couts d'eligibilite sont des penalites de l'objectif. Meme lorsqu'une valeur
+est tres elevee, elle n'interdit pas a elle seule une session ; elle rend
+simplement cette option tres defavorable, sauf si le couple est interdit par une
+contrainte ou par l'absence de variable.
 
-\[
-f : \text{budget maximal de sessions PC}
-\]
+## 6. Variables de decision
 
-\[
-k : \text{budget maximal de sessions TPC}
-\]
+La variable d'affectation indique si une commune est rattachee a une session
+candidate :
 
-\[
-B = f + k : \text{budget total declare de sessions}
-\]
-
-Les couts d'eligibilite d'un pivot \(j\) sont :
-
-\[
-e_j^{\mathrm{PC}} : \text{cout si } j \text{ heberge une session PC}
-\]
-
-\[
-e_j^{\mathrm{TPC}} : \text{cout si } j \text{ heberge une session TPC}
-\]
-
-La fonction objectif combine trois poids :
-
-\[
-w_t : \text{poids du temps de trajet}
-\]
-
-\[
-w_e : \text{poids des couts d'eligibilite}
-\]
-
-\[
-w_m : \text{poids de la mixite residuelle}
-\]
-
-Ces poids ne changent pas la faisabilite. Ils changent uniquement le classement des solutions faisables.
-
-## 5. Construction des variables
-
-L'affectation est representee par :
-
-\[
+$$
 x_{ijm} \in \{0,1\}
-\]
+$$
 
-avec :
-
-\[
+$$
 x_{ijm}=1
-\iff
-\text{la commune } i \text{ est affectee a la formation } (j,m).
-\]
+\quad \Longleftrightarrow \quad
+\text{la commune } i \text{ est affectee a la session } (j,m).
+$$
 
-La variable d'ouverture est :
+Cette variable n'existe pas pour tous les triplets possibles. Elle est creee
+uniquement pour les couples commune-pivot admissibles et compatibles.
 
-\[
+La variable d'ouverture indique si une session candidate est effectivement
+ouverte :
+
+$$
 y_{jm} \in \{0,1\}
-\]
+$$
 
-avec :
-
-\[
+$$
 y_{jm}=1
-\iff
-\text{la formation } (j,m) \text{ est ouverte}.
-\]
+\quad \Longleftrightarrow \quad
+\text{la session } (j,m) \text{ est ouverte.}
+$$
 
-La variable de type TPC est :
+La variable de type distingue les sessions PC et TPC :
 
-\[
+$$
 z_{jm} \in \{0,1\}
-\]
+$$
 
-avec :
-
-\[
+$$
 z_{jm}=1
-\iff
-\text{la formation } (j,m) \text{ est de type TPC}.
-\]
+\quad \Longleftrightarrow \quad
+\text{la session } (j,m) \text{ est de type TPC.}
+$$
 
-La mixite residuelle est mesuree par :
+Lorsque `z_jm = 0` et que la session est ouverte, elle est interpretee comme une
+session PC.
 
-\[
+La variable de mixite residuelle est entiere :
+
+$$
 d_{jm} \in \mathbb{N}
-\]
+$$
 
-Les variables \(x_{ijm}\) ne sont creees que si :
+Elle mesure le nombre de CC TPC affectes a une session PC. Pour une session TPC,
+elle peut rester nulle, car la presence de communes TPC y est naturelle.
 
-\[
+La condition de creation des variables d'affectation est :
+
+$$
 a_{ij}=1
-\quad\text{et}\quad
+\quad \text{et} \quad
 b_{ij}=1.
-\]
+$$
 
-Cette restriction est importante pour la performance : les couples interdits ne sont pas seulement penalises, ils sont absents du modele.
+Cette restriction est decisive pour la taille du modele : un couple interdit ne
+devient pas une variable penalisee, il n'existe tout simplement pas dans le
+modele CP-SAT.
 
-## 6. Fonction objectif
+## 7. Fonction objectif
 
-L'objectif contient trois composantes lineaires.
+Le modele minimise une somme ponderee de trois composantes : le cout de trajet,
+le cout d'eligibilite des pivots et la mixite residuelle.
 
-Le cout de trajet est :
+La composante de trajet est :
 
-\[
-\operatorname{Obj}_{\mathrm{trajet}}
+$$
+\operatorname{Obj}_{trajet}
 =
 \sum_{i \in C}
 \sum_{(j,m)\in S}
 q_i \tau_{ij} x_{ijm}
-\]
+$$
 
-Chaque temps est multiplie par le nombre de CC de la commune affectee.
+Chaque temps de trajet est multiplie par le nombre de CC de la commune. Une
+commune de plus de 5000 habitants pese donc deux fois plus qu'une commune a un
+seul CC.
 
-Le cout d'eligibilite est :
+La composante d'eligibilite est :
 
-\[
-\operatorname{Obj}_{\mathrm{eligibilite}}
+$$
+\operatorname{Obj}_{eligibilite}
 =
 \sum_{(j,m)\in S}
 \left[
-e_j^{\mathrm{PC}} y_{jm}
+e_j^{PC} y_{jm}
 +
-\left(e_j^{\mathrm{TPC}}-e_j^{\mathrm{PC}}\right)z_{jm}
+\left(e_j^{TPC}-e_j^{PC}\right) z_{jm}
 \right]
-\]
+$$
 
-Si une session est ouverte et PC, alors \(y_{jm}=1\) et \(z_{jm}=0\), donc le cout vaut \(e_j^{\mathrm{PC}}\). Si elle est TPC, alors \(y_{jm}=1\) et \(z_{jm}=1\), donc le cout vaut \(e_j^{\mathrm{TPC}}\).
+Si la session est ouverte et PC, alors `y_jm = 1` et `z_jm = 0`, donc le cout
+vaut `e_j^{PC}`. Si elle est TPC, alors `z_jm = 1`, et l'expression vaut
+`e_j^{TPC}`. Cette ecriture evite tout produit entre variables.
 
-La penalite de mixite residuelle est :
+La composante de mixite est :
 
-\[
-\operatorname{Obj}_{\mathrm{mixite}}
+$$
+\operatorname{Obj}_{mixite}
 =
 \sum_{(j,m)\in S}
 d_{jm}
-\]
+$$
+
+Elle penalise la presence de CC TPC dans des sessions PC, sans l'interdire.
 
 L'objectif global est :
 
-\[
+$$
 \min
 \quad
-w_t \operatorname{Obj}_{\mathrm{trajet}}
+w_t \operatorname{Obj}_{trajet}
 +
-w_e \operatorname{Obj}_{\mathrm{eligibilite}}
+w_e \operatorname{Obj}_{eligibilite}
 +
-w_m \operatorname{Obj}_{\mathrm{mixite}}
-\]
+w_m \operatorname{Obj}_{mixite}
+$$
 
-La formulation est lineaire car chaque terme est une constante multipliee par une variable entiere ou booleenne, ou une somme de ces termes. Elle est donc compatible avec CP-SAT.
+La formulation est lineaire : chaque terme est une constante multipliee par une
+variable booleenne ou entiere, ou une somme de tels termes. Le modele reste donc
+compatible avec CP-SAT et ne contient pas de produit entre variables.
 
-## 7. Contraintes du modele
+## 8. Contraintes
 
-On note \(S_i\) l'ensemble des slots pour lesquels une variable \(x_{ijm}\) existe pour la commune \(i\).
+Les contraintes ci-dessous sont les contraintes dures du modele. Une solution
+qui en viole une n'est pas faisable, quel que soit son cout objectif.
 
-### Contrainte 1 - Affectation unique
+### 8.1 Affectation unique
 
-\[
-\sum_{(j,m)\in S_i} x_{ijm} = 1,
-\qquad \forall i \in C
-\]
+Pour chaque commune, exactement une variable d'affectation doit etre active :
 
-Chaque commune doit etre affectee exactement une fois.
+$$
+\sum_{(j,m)\in S_i} x_{ijm} = 1
+\qquad
+\forall i \in C
+$$
 
-### Contrainte 2 - Pas d'affectation sans ouverture
+`S_i` designe les sessions candidates pour lesquelles une variable `x_ijm`
+existe pour la commune `i`. Cette contrainte garantit qu'aucune commune n'est
+oubliee et qu'aucune commune n'est affectee deux fois.
 
-\[
-x_{ijm} \leq y_{jm},
-\qquad \forall x_{ijm}
-\]
+### 8.2 Pas d'affectation sans ouverture
 
-Une commune ne peut etre affectee qu'a une formation ouverte.
+Une commune ne peut etre affectee qu'a une session ouverte :
 
-### Contrainte 3 - Capacite et remplissage
+$$
+x_{ijm} \leq y_{jm}
+\qquad
+\forall x_{ijm}
+$$
 
-\[
+Si `y_jm = 0`, alors toutes les affectations vers cette session doivent valoir
+`0`.
+
+### 8.3 Capacite et remplissage minimal
+
+La charge d'une session ouverte doit rester entre `L` et `Q` :
+
+$$
 L y_{jm}
 \leq
 \sum_{i\in C} q_i x_{ijm}
 \leq
-Q y_{jm},
-\qquad \forall (j,m)\in S
-\]
+Q y_{jm}
+\qquad
+\forall (j,m)\in S
+$$
 
-Si la formation est fermee, la somme vaut 0. Si elle est ouverte, elle doit contenir entre \(L\) et \(Q\) CC.
+Si la session est fermee, `y_jm = 0` et la charge imposee est nulle. Si elle est
+ouverte, elle doit respecter le remplissage minimal et la capacite maximale.
 
-### Contrainte 4 - Coherence type/ouverture
+### 8.4 Coherence entre type et ouverture
 
-\[
-z_{jm} \leq y_{jm},
-\qquad \forall (j,m)\in S
-\]
+Une session fermee ne peut pas etre declaree TPC :
 
-Une formation ne peut pas etre de type TPC si elle n'est pas ouverte.
+$$
+z_{jm} \leq y_{jm}
+\qquad
+\forall (j,m)\in S
+$$
 
-### Contrainte 5 - Budget PC
+Cette contrainte donne un sens a `z_jm` uniquement lorsque la session existe.
 
-\[
+### 8.5 Budget PC
+
+Le nombre de sessions PC ouvertes ne doit pas depasser `f` :
+
+$$
 \sum_{(j,m)\in S} (y_{jm}-z_{jm}) \leq f
-\]
+$$
 
-Le nombre de sessions ouvertes non TPC, donc PC, ne doit pas depasser le budget \(f\).
+Pour une session ouverte PC, `y_jm - z_jm = 1`. Pour une session TPC, cette
+quantite vaut `0`. La contrainte compte donc les sessions PC.
 
-### Contrainte 6 - Budget TPC
+### 8.6 Budget TPC
 
-\[
+Le nombre de sessions TPC ouvertes ne doit pas depasser `k` :
+
+$$
 \sum_{(j,m)\in S} z_{jm} \leq k
-\]
+$$
 
-Le nombre de sessions TPC ouvertes ne doit pas depasser le budget \(k\).
+Le budget total `B` est valide en configuration par l'invariant `B = f + k`.
+Dans le modele, les deux contraintes precedentes pilotent directement les
+budgets par type.
 
-### Contrainte 7 - Ordre d'ouverture
+### 8.7 Ordre d'ouverture des slots
 
-\[
-y_{j,m+1} \leq y_{jm},
+Pour les pivots PC, les slots doivent etre ouverts dans l'ordre :
+
+$$
+y_{j,m+1} \leq y_{jm}
 \qquad
-\forall j\in P,\quad m=1,\dots,M_j-1
-\]
+\forall j \in P,\ \forall m \in \{1,\dots,M_j-1\}
+$$
 
-Pour une commune pivot PC, la deuxieme session ne peut etre ouverte que si la premiere l'est deja, et la troisieme seulement si la deuxieme l'est deja. Cette contrainte reduit les symetries.
+Cette contrainte reduit les symetries. Elle evite par exemple d'ouvrir le slot
+2 d'un pivot PC alors que le slot 1 du meme pivot est ferme. Elle ne s'applique
+pas aux pivots TPC, qui n'ont qu'un seul slot.
 
-### Contrainte 8 - Asymetrie PC vers TPC
+### 8.8 Interdiction des PC dans une formation TPC
 
-\[
-x_{ijm} \leq 1-z_{jm},
+Une commune PC ne peut pas etre affectee a une session de type TPC :
+
+$$
+x_{ijm} \leq 1-z_{jm}
 \qquad
-\forall i\in P,\quad \forall (j,m)\in S_i
-\]
+\forall i \in P,\ \forall (j,m)\in S_i
+$$
 
-Une commune PC ne peut pas etre affectee a une session TPC. En revanche, une commune TPC peut etre affectee a une session PC.
+Si `z_jm = 1`, la session est TPC et toutes les affectations de communes PC vers
+cette session sont forcees a `0`. En revanche, une commune TPC peut etre
+affectee a une session PC ; cette situation est autorisee mais penalisee par la
+mixite.
 
-### Contrainte 9 - Mixite residuelle
+Point de vigilance : cette contrainte porte sur la categorie des communes
+affectees, pas sur la categorie du pivot. Dans le modele actuel, une session TPC
+peut donc avoir une commune pivot PC si aucune autre contrainte ne l'interdit.
+Comme le pivot n'est pas automatiquement force a appartenir a sa propre session,
+cette situation n'implique pas qu'une commune PC soit affectee a une session TPC.
 
-On definit le nombre de CC TPC affectes a une session :
+### 8.9 Definition de la mixite residuelle
 
-\[
-n_{jm}^{\mathcal{T}}
+On note le nombre de CC TPC affectes a une session :
+
+$$
+n_{jm}^{T}
 =
-\sum_{i\in \mathcal{T}} q_i x_{ijm}
-\]
+\sum_{i\in T} q_i x_{ijm}
+$$
 
-Puis :
+La variable `d_jm` doit couvrir la part TPC presente dans une session PC :
 
-\[
-d_{jm} \geq n_{jm}^{\mathcal{T}} - Qz_{jm}
-\]
+$$
+d_{jm} \geq n_{jm}^{T} - Qz_{jm}
+$$
 
-\[
+$$
 d_{jm} \geq 0
-\]
+$$
 
-Si la session est TPC, alors \(z_{jm}=1\), donc \(n_{jm}^{\mathcal{T}} - Qz_{jm} \leq 0\) car une session ne depasse pas \(Q\). La penalite peut donc rester nulle. Si la session est PC, alors \(z_{jm}=0\), et \(d_{jm}\) mesure le nombre de CC TPC affectes a cette session PC.
+Si la session est TPC, `z_jm = 1` et `n_{jm}^{T} - Qz_{jm}` est inferieur ou
+egal a zero grace a la capacite maximale. `d_jm` peut donc rester nul. Si la
+session est PC, `z_jm = 0` et `d_jm` mesure le nombre de CC TPC places dans une
+session PC.
 
-## 8. Diagnostic pre-resolution
+## 9. Diagnostic pre-resolution
 
-Le diagnostic pre-resolution ne prouve pas la faisabilite, mais il detecte les problemes manifestes avant de construire ou resoudre le modele.
+Le diagnostic pre-resolution signale des problemes structurels avant l'appel au
+solveur. Il ne prouve pas la faisabilite, mais il permet d'identifier rapidement
+des causes probables d'echec.
 
-Il controle notamment :
+Les controles actuels portent notamment sur les communes sans pivot admissible,
+les communes PC sans pivot compatible permettant une session PC, le volume total
+de CC, le nombre de slots candidats et le nombre de trajets admissibles.
 
-- les communes orphelines, c'est-a-dire sans aucun pivot admissible ;
-- les communes PC sans pivot compatible permettant une session PC ;
-- le nombre total de CC ;
-- une borne minimale du nombre de formations :
+Une borne minimale du nombre de formations est calculee a partir de la capacite
+maximale :
 
-\[
+$$
 B_{\min}
 =
 \left\lceil
-\frac{\sum_{i\in C}q_i}{Q}
+\frac{\sum_{i\in C} q_i}{Q}
 \right\rceil
-\]
+$$
 
-- la coherence du budget :
+Cette borne indique le nombre minimal de sessions necessaires si l'on ne regarde
+que le volume total de CC et la capacite `Q`. Elle ne tient pas compte des
+trajets, des compatibilites, des categories ou des budgets par type ; elle reste
+donc une alerte simple, pas une preuve complete.
 
-\[
-B \geq B_{\min}
-\]
+Le diagnostic verifie aussi la coherence de `B`, `f` et `k`, ainsi que la
+disponibilite des coordonnees pour la carte. Il ne calcule pas explicitement des
+zones TPC isolees ; ces cas sont observes indirectement via les communes
+orphelines, les trajets admissibles et les resultats du solveur.
 
-- la coherence declarative :
+## 10. Resolution CP-SAT
 
-\[
-B=f+k
-\]
+Le modele est resolu avec OR-Tools CP-SAT. Ce solveur cherche une affectation
+entiere qui respecte toutes les contraintes dures, puis minimise l'objectif
+pondere.
 
-- le nombre de trajets admissibles ;
-- le nombre de slots candidats ;
-- la disponibilite des coordonnees pour la carte.
+La configuration transmet au solveur les parametres operationnels suivants :
+temps limite, nombre de workers, graine aleatoire et activation eventuelle des
+logs. Le nombre de workers peut accelerer la recherche, mais il ne change pas le
+modele mathematique.
 
-Ces controles sont des alertes. Une absence d'alerte ne garantit pas que CP-SAT trouvera une solution dans le temps imparti.
+Les principaux statuts sont :
 
-## 9. Resolution CP-SAT
+| Statut | Interpretation |
+| --- | --- |
+| `OPTIMAL` | une solution optimale est trouvee et prouvee |
+| `FEASIBLE` | une solution faisable est trouvee, mais l'optimalite n'est pas demontree |
+| `INFEASIBLE` | le solveur prouve qu'aucune solution ne respecte les contraintes |
+| `UNKNOWN` | le solveur n'a pas fourni de conclusion exploitable dans les limites donnees |
 
-Le modele est transmis a OR-Tools CP-SAT. Le solveur cherche une solution entiere respectant toutes les contraintes, puis optimise l'objectif.
+Une solution `FEASIBLE` respecte les contraintes. Elle ne doit pas etre decrite
+comme optimale : le solveur n'a pas demontre qu'aucune meilleure solution
+n'existe.
 
-Les statuts principaux sont :
+## 11. Extraction et validation
 
-- `OPTIMAL` : une solution optimale est trouvee et prouvee ;
-- `FEASIBLE` : une solution faisable est trouvee, mais l'optimalite n'est pas prouvee ;
-- `INFEASIBLE` : le solveur prouve qu'aucune solution ne respecte les contraintes ;
-- `UNKNOWN` : aucune conclusion exploitable n'est disponible dans les limites donnees.
+Le solveur retourne des valeurs de variables. Ces valeurs ne sont pas encore un
+livrable metier directement exploitable. Le module `solution_extractor.py`
+reconstruit d'abord des objets lisibles : sessions ouvertes, communes affectees
+et decomposition de l'objectif.
 
-On a donc :
+L'extraction n'est lancee que pour les statuts `OPTIMAL` et `FEASIBLE`. Pour
+chaque session ouverte, elle calcule le pivot, le type de session, les charges,
+les temps de trajet, les populations et la mixite residuelle. Pour chaque
+commune, elle reconstruit la session retenue, le pivot, le temps de trajet, la
+categorie, la population et le nombre de CC.
 
-\[
-\text{FEASIBLE} \neq \text{OPTIMAL}
-\]
-
-Un statut `FEASIBLE` signifie que les contraintes sont respectees. Il ne signifie pas que le cout est minimal.
-
-La configuration controle :
-
-- le temps limite de resolution ;
-- le nombre de workers CP-SAT ;
-- l'activation des logs ;
-- le `random_seed`.
-
-Le parallelisme peut accelerer la recherche, mais il ne change pas le modele. Le `random_seed` aide a rendre les recherches plus reproductibles. L'objectif indique la valeur de la meilleure solution trouvee. La borne indique ce que le solveur sait prouver sur le meilleur optimum possible.
-
-## 10. Extraction de solution
-
-L'extraction n'est lancee que pour les statuts `OPTIMAL` ou `FEASIBLE`.
-
-L'ensemble des sessions ouvertes est :
-
-\[
-\mathcal{S}^{\mathrm{open}}
-=
-\{(j,m)\in S : y_{jm}=1\}
-\]
-
-Pour chaque session ouverte, l'extracteur calcule :
-
-- le code et le nom du pivot ;
-- le numero de slot ;
-- le type PC ou TPC ;
-- le nombre de communes affectees ;
-- le nombre total de CC ;
-- le temps moyen ;
-- le temps maximum ;
-- la population minimale et maximale ;
-- le nombre de CC PC et TPC ;
-- la mixite residuelle ;
-- le cout d'eligibilite ;
-- les composantes d'objectif associees.
-
-Pour chaque commune, l'extracteur calcule :
-
-- la session affectee ;
-- le pivot ;
-- le temps de trajet ;
-- la categorie PC/TPC ;
-- le nombre de CC ;
-- la population ;
-- les coordonnees si disponibles.
-
-Ces tables sont des objets metier reconstruits a partir des valeurs des variables CP-SAT.
-
-## 11. Validation post-solution
-
-La solution extraite est revalidee independamment du solveur. Cette validation ne repose pas seulement sur la confiance dans CP-SAT ; elle recalcule les contraintes et l'objectif a partir de la solution extraite.
-
-En implementation, cette validation porte sur l'objet `ExtractedSolution` en
-memoire, avant toute ecriture de fichier. Les exports sont produits seulement
-apres validation. Ils peuvent ensuite etre relus pour analyse ou pour
-regenerer la carte, mais ils ne sont pas la base de la validation initiale.
-
-Les controles portent sur :
-
-- l'affectation unique ;
-- l'existence des sessions referencees ;
-- les capacites minimale et maximale ;
-- les budgets PC et TPC ;
-- l'asymetrie PC vers TPC ;
-- les temps de trajet admissibles ;
-- les compatibilites ;
-- la coherence de \(d_{jm}\) ;
-- l'objectif recalcule.
+Le module `validation.py` recontrole ensuite la solution extraite en memoire,
+avant tout export. La validation verifie notamment l'affectation unique,
+l'existence des sessions referencees, les capacites, les budgets, l'interdiction
+des PC dans les sessions TPC, les temps de trajet, les compatibilites, la
+coherence de `d_jm` et l'objectif recalcule.
 
 La condition operationnelle est :
 
-\[
+$$
 \text{solution exploitable}
-\iff
+\Longleftrightarrow
 \text{solution extraite}
 +
 \text{validation OK}
-\]
+$$
 
-Une solution non validee ne doit pas etre consideree comme source de verite metier.
+Les exports sont produits seulement apres cette validation. Relire des exports
+peut servir a l'analyse ou a la regeneration de la carte, mais les exports ne
+sont pas la base de la validation initiale.
 
 ## 12. Assouplissement hierarchique
 
-L'assouplissement hierarchique tente plusieurs configurations de plus en plus permissives ou moins penalisees. Chaque niveau reconstruit le modele, relance le solveur, extrait et valide la solution.
-
-```text
-Pour chaque niveau d'assouplissement :
-    creer une copie de la configuration
-    modifier uniquement les parametres autorises
-    reconstruire le modele
-    resoudre
-    extraire
-    valider
-    journaliser
-    si validation OK :
-        arreter
-```
+Le workflow `solve-relaxed` applique une hierarchie de tentatives. Il commence
+toujours par la configuration initiale. Si aucune solution validee n'est obtenue,
+il cree des copies independantes de la configuration et modifie uniquement des
+parametres explicitement autorises par le protocole.
 
 Les niveaux implementes sont :
 
-0. configuration initiale ;
-1. modification de \(w_m\) ;
-2. reduction des couts TPC ;
-3. augmentation de \(T\) ;
-4. reduction de \(L\) ;
-5. augmentation de \(Q\) ;
-6. augmentation coherente de \(f\), \(k\) et \(B\) ;
-7. remplacement des couts tres eleves si cette option est explicitement autorisee.
+1. configuration initiale ;
+2. ajustement du poids `w_m` ;
+3. reduction des couts d'eligibilite TPC ;
+4. augmentation du seuil de trajet `T` ;
+5. reduction du remplissage minimal `L` ;
+6. augmentation de la capacite `Q` ;
+7. augmentation coherente de `f`, `k` et `B` ;
+8. remplacement final des couts tres eleves par une penalite finie, si cette
+   option est autorisee.
 
-La contrainte d'asymetrie PC vers TPC n'est pas relachee automatiquement :
+A chaque tentative, toute la chaine est relancee : parametres derives, modele
+CP-SAT, solveur, extraction et validation. Le workflow s'arrete a la premiere
+solution validee et journalise les tentatives executees.
 
-\[
-\text{contrainte PC} \rightarrow \text{TPC non relachee}
-\]
+La contrainte interdisant les communes PC dans une session TPC n'est jamais
+relachee automatiquement. Si cette contrainte bloque une zone, il s'agit d'une
+decision metier a examiner explicitement, pas d'un assouplissement standard du
+code.
 
-L'assouplissement agit donc sur certains parametres de faisabilite ou sur certains couts, mais il ne change pas la structure fondamentale du modele.
+## 13. Exports et visualisation
 
-## 13. Exports et carte
+Une solution validee peut etre restituee sous plusieurs formes :
 
-Les exports principaux sont :
+| Fichier | Role |
+| --- | --- |
+| `sessions.csv` | detail des sessions ouvertes, charges, types, alertes et indicateurs |
+| `communes_affectees.csv` | affectation de chaque commune a une session et a un pivot |
+| `rapport_solution.md` | synthese lisible de la solution et des controles |
+| `statistiques_solution.json` | statistiques structurees pour analyse ou reutilisation |
+| `config_utilisee.yaml` | copie de la configuration ayant produit la solution |
+| `solution_map.html` | carte HTML autonome de controle visuel |
 
-- `sessions.csv` ;
-- `communes_affectees.csv` ;
-- `rapport_solution.md` ;
-- `statistiques_solution.json` ;
-- `config_utilisee.yaml` ;
-- `solution_map.html`.
+La source de verite operationnelle est :
 
-Les fichiers CSV et JSON de solution sont les supports de controle et de restitution. Le rapport Markdown donne une lecture synthetique. La carte HTML affiche les communes, pivots, sessions, filtres et diagnostics cartographiques.
-
-La carte n'est pas la source de verite. Elle peut aider a comprendre la solution, mais les decisions metier doivent s'appuyer sur les exports valides.
-
-\[
+$$
 \text{source de verite}
 =
 \text{exports valides}
 +
 \text{configuration utilisee}
-\]
+$$
 
-Les coordonnees n'interviennent pas dans le modele CP-SAT actuel. Elles servent a la visualisation cartographique.
+La carte est une visualisation de controle. Elle aide a inspecter les pivots,
+les affectations, les temps de trajet proches du seuil et les alertes, mais elle
+ne remplace pas les CSV, le rapport, le JSON de statistiques et la configuration
+utilisee.
 
-## 14. Complexite et performance
+Les coordonnees n'interviennent pas dans le modele CP-SAT. Elles servent
+uniquement a positionner les points sur la carte. Les communes sans coordonnees
+restent dans la solution et dans les exports.
 
-La taille du modele depend surtout du nombre de variables d'affectation \(x\).
+## 14. Performance et taille du modele
 
-\[
-|\mathcal{X}|
+La taille du modele depend surtout du nombre de variables d'affectation `x`.
+Ces variables sont creees pour les couples commune-pivot admissibles,
+compatibles, puis dupliquees sur les slots du pivot.
+
+$$
+\left|X\right|
 =
 \sum_{i\in C}
 \sum_{j\in F}
 M_j
 \mathbf{1}_{a_{ij}=1}
 \mathbf{1}_{b_{ij}=1}
-\]
+$$
 
-Cette formule montre que les variables augmentent avec :
+Cette formule explique pourquoi le seuil de trajet `T` a un effet important.
+Augmenter `T` augmente souvent le nombre de couples admissibles et donc le
+nombre de variables. Le probleme peut devenir plus facile a rendre faisable,
+mais plus difficile a optimiser. Reduire `T` a l'effet inverse : le modele est
+plus petit, mais le risque d'infaisabilite augmente.
 
-- le nombre de communes ;
-- le nombre de pivots candidats ;
-- le nombre de slots par pivot ;
-- le nombre de trajets admissibles ;
-- le nombre de compatibilites autorisees.
+Le nombre de pivots candidats et les valeurs `M_j` jouent aussi un role direct.
+Comme `F = C`, chaque commune est candidate pivot. Les communes PC generent
+jusqu'a trois slots, alors que les communes TPC n'en generent qu'un.
 
-Reduire le seuil \(T\) diminue le nombre de couples admissibles, donc reduit fortement la taille du modele, mais peut rendre le probleme infaisable. Augmenter \(T\) a l'effet inverse. Augmenter \(M_j\), \(Q\), ou les budgets peut faciliter la faisabilite, mais augmente souvent l'espace de recherche.
-
-Le nombre de workers influence la recherche du solveur. Il ne modifie pas les contraintes. Trouver une solution faisable peut etre rapide alors que prouver son optimalite peut demander beaucoup plus de temps.
+Il faut enfin distinguer trouver une solution faisable et prouver son
+optimalite. CP-SAT peut trouver rapidement une solution respectant les
+contraintes, puis avoir besoin de beaucoup plus de temps pour prouver qu'elle
+est optimale. Le parallelisme peut ameliorer la recherche, mais il ne change ni
+les contraintes ni la fonction objectif.
 
 ## 15. Correspondance code / mathematiques
 
-| Element mathematique | Role | Fichier Python |
+| Element | Signification | Fichier |
 | --- | --- | --- |
-| \(C,P,\mathcal{T},F,S\) | ensembles | `parameters.py` |
-| \(q_i\) | nombre de CC | `parameters.py` |
-| \(a_{ij}\) | admissibilite trajet | `parameters.py` |
-| \(b_{ij}\) | compatibilite | `parameters.py` |
-| \(\tau_{ij}\) | temps de trajet | `parameters.py` |
-| \(x,y,z,d\) | variables | `model_builder.py` |
-| objectif | optimisation | `model_builder.py` |
+| `C`, `P`, `T`, `F`, `S` | ensembles | `parameters.py` |
+| `q_i` | nombre de CC | `parameters.py` |
+| `tau_ij` | temps de trajet | `parameters.py` |
+| `a_ij` | admissibilite trajet | `parameters.py` |
+| `b_ij` | compatibilite metier | `parameters.py` |
+| `e_j_PC`, `e_j_TPC` | couts d'eligibilite | `parameters.py` |
+| `x`, `y`, `z`, `d` | variables CP-SAT | `model_builder.py` |
+| objectif | fonction a minimiser | `model_builder.py` |
 | contraintes | modele CP-SAT | `model_builder.py` |
-| diagnostic | controles pre-resolution | `diagnostics.py` |
-| solveur | appel OR-Tools CP-SAT | `solver.py` |
-| extraction | tables metier | `solution_extractor.py` |
-| validation | controle solution | `validation.py` |
+| extraction | solution metier | `solution_extractor.py` |
+| validation | controle post-solution | `validation.py` |
 | assouplissement | scenarios hierarchiques | `relaxation.py` |
 | exports | restitution | `export.py` |
 | carte | visualisation | `map_export.py` |
 
-## 16. Limites du modele
+## 16. Limites et points de vigilance
 
-Les limites actuelles sont :
+Le modele actuel est volontairement centre sur l'affectation des communes aux
+sessions. Les limites suivantes doivent etre connues avant toute utilisation
+metier :
 
-- l'optimalite peut ne pas etre prouvee dans le temps limite ;
-- les poids d'objectif doivent etre calibres avec prudence ;
-- les couts tres eleves doivent etre interpretes comme des penalites, pas comme des interdictions sauf si le modele les interdit explicitement ;
-- les trajets absents sont interdits ;
-- les trajets diagonaux \(i \rightarrow i\) ne sont pas generes automatiquement par la preparation ;
-- les coordonnees servent seulement a la carte ;
-- le modele ne force pas actuellement une commune pivot ouverte a etre affectee a sa propre formation ;
-- les superviseurs et disponibilites ne sont pas optimises par le modele si aucune variable ou contrainte dediee ne les encode ;
-- une validation metier reste necessaire apres la validation algorithmique.
+- un statut `FEASIBLE` ne garantit pas l'optimalite ;
+- les poids `w_t`, `w_e` et `w_m` doivent etre calibres avec prudence ;
+- les couts tres eleves sont des penalites, pas des interdictions ;
+- les trajets absents sont interdits car aucune variable n'est creee ;
+- les trajets diagonaux `i -> i` ne sont pas generes automatiquement ;
+- les coordonnees servent uniquement a la carte ;
+- une commune pivot ouverte n'est pas forcement affectee a sa propre session ;
+- une session TPC peut avoir un pivot PC si le pivot n'est pas contraint a etre
+  membre de sa session ;
+- les superviseurs, disponibilites et contraintes calendaires ne sont pas
+  optimises si aucune variable ou contrainte dediee ne les encode ;
+- une validation metier finale reste necessaire apres la validation
+  algorithmique.
 
-Le modele separe donc clairement :
+Ces limites ne sont pas des erreurs d'execution. Elles delimitent le perimetre
+exact du modele implemente et les points a discuter avant toute extension.
 
-- les contraintes dures, qui definissent la faisabilite ;
-- les penalites, qui orientent l'optimisation ;
-- les diagnostics, qui alertent avant resolution ;
-- la visualisation, qui aide a inspecter la solution mais ne la definit pas.
+## 17. Conclusion
 
-La documentation de maintenance doit decrire l'etat reel du code. Toute
-extension non implementee doit etre marquee comme limite ou perspective, jamais
-comme fonctionnalite existante.
+L'outil produit une solution d'affectation en combinant une preparation de
+donnees, une formulation CP-SAT, une resolution parametree, une extraction
+metier et une validation independante. Cette chaine permet d'obtenir des
+exports controles et une carte de visualisation sans confondre optimisation,
+validation et expertise metier.
+
+La validation algorithmique garantit que la solution extraite respecte les
+contraintes codees. Elle ne remplace pas l'analyse humaine des alertes, des
+choix de penalites, des pivots retenus et des conditions operationnelles non
+modelees. Les exports et la carte servent donc a qualifier la solution et a
+faciliter la revue metier.
+
+Ce document constitue la reference pour comprendre comment les objets du code,
+les notations mathematiques et les fichiers produits s'articulent dans
+l'implementation actuelle.
