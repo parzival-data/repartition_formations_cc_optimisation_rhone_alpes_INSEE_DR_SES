@@ -58,7 +58,7 @@ couleurs proches lorsque beaucoup de sessions sont affichees.
 Le contour indique le niveau d'alerte :
 
 - `OK` : aucune alerte detectee ;
-- `warning` : point ou session a verifier metieriquement, sans violation
+- `warning` : point ou session a verifier par les experts metier, sans violation
   bloquante des contraintes ;
 - `error` : anomalie forte ou incoherence detectee dans les controles affiches,
   si ce niveau est present dans les donnees embarquees.

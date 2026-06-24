@@ -413,7 +413,7 @@ const missingCoordinates = {_json(missing)};
         <li><span class="sample circle pivot"></span><span>Symbole plus gros : commune pivot d'au moins une session.</span></li>
         <li><span class="sample circle" style="background:#9333ea"></span><span>Couleur : session ou groupe de formation. Avec beaucoup de sessions, deux couleurs peuvent être proches.</span></li>
         <li><span class="sample circle"></span><span>Contour normal : OK, aucune alerte détectée.</span></li>
-        <li><span class="sample circle warning-sample"></span><span>Warning : point ou session à vérifier métieriquement, sans violation bloquante.</span></li>
+        <li><span class="sample circle warning-sample"></span><span>Warning : point ou session à vérifier par les experts métier, sans violation bloquante.</span></li>
         <li><span class="sample circle error-sample"></span><span>Error : anomalie forte ou incohérence détectée dans les contrôles affichés.</span></li>
         <li><span class="line-sample"></span><span>Ligne commune → pivot : liaison facultative, masquée par défaut et affichable avec le filtre dédié.</span></li>
       </ul>

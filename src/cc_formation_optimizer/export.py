@@ -360,15 +360,18 @@ def _write_markdown_report(
                 sorted(session_rows, key=lambda row: row["mixite_TPC_dans_session_PC"], reverse=True)[:10]
             ),
             "",
-            "## Communes sans coordonnees",
+            "## Donnees et cartographie",
             "",
-            "Non disponible : les champs de coordonnees ne sont pas encore fournis dans les donnees d'entree.",
+            "- Les donnees reelles peuvent etre preparees avec `prepare-data` avant resolution.",
+            "- Les coordonnees latitude/longitude sont optionnelles. Elles sont integrees aux communes si elles sont presentes dans les donnees propres.",
+            "- La carte HTML peut etre produite avec `--map` ou regeneree avec `render-map`; les communes sans coordonnees restent dans les exports mais ne sont pas dessinees.",
             "",
             "## Limites connues",
             "",
-            "- Les donnees reelles ne sont pas encore integrees.",
-            "- L'assouplissement hierarchique automatique n'est pas encore implemente.",
+            "- L'assouplissement hierarchique est disponible via `solve-relaxed`; il conserve les contraintes dures documentees.",
+            "- Les superviseurs, disponibilites et contraintes calendaires ne sont pas optimises par le modele actuel.",
             "- Les exports XLSX sont optionnels et dependent de la disponibilite de la dependance locale.",
+            "- Une validation metier finale reste necessaire apres la validation algorithmique.",
         ]
     )
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")

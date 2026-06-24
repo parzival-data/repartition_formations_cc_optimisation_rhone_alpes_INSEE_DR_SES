@@ -539,7 +539,12 @@ Ces tables sont des objets metier reconstruits a partir des valeurs des variable
 
 ## 11. Validation post-solution
 
-La solution extraite est revalidee independamment du solveur. Cette validation ne repose pas seulement sur la confiance dans CP-SAT ; elle recalcule les contraintes et l'objectif a partir des exports metier.
+La solution extraite est revalidee independamment du solveur. Cette validation ne repose pas seulement sur la confiance dans CP-SAT ; elle recalcule les contraintes et l'objectif a partir de la solution extraite.
+
+En implementation, cette validation porte sur l'objet `ExtractedSolution` en
+memoire, avant toute ecriture de fichier. Les exports sont produits seulement
+apres validation. Ils peuvent ensuite etre relus pour analyse ou pour
+regenerer la carte, mais ils ne sont pas la base de la validation initiale.
 
 Les controles portent sur :
 
@@ -692,3 +697,7 @@ Le modele separe donc clairement :
 - les penalites, qui orientent l'optimisation ;
 - les diagnostics, qui alertent avant resolution ;
 - la visualisation, qui aide a inspecter la solution mais ne la definit pas.
+
+La documentation de maintenance doit decrire l'etat reel du code. Toute
+extension non implementee doit etre marquee comme limite ou perspective, jamais
+comme fonctionnalite existante.

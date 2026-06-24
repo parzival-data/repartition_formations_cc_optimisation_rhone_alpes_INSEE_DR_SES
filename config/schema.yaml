@@ -1,10 +1,25 @@
 metadata:
   required: [name, version]
+  optional: [description]
+
 inputs:
   required:
     - communes_path
     - travel_times_path
     - missing_travel_time_policy
+  optional:
+    - compatibility_path
+  fields:
+    communes_path: Chemin du CSV propre des communes.
+    travel_times_path: Chemin du CSV propre des temps de trajet.
+    compatibility_path: Chemin optionnel du CSV de compatibilites.
+    missing_travel_time_policy:
+      supported_values: [forbidden]
+      description: >
+        La seule politique effectivement supportee par le code actuel est
+        forbidden. Les trajets absents ne creent pas de variable
+        d'affectation et sont donc interdits.
+
 columns:
   required:
     - commune_id
@@ -14,6 +29,52 @@ columns:
     - origin_id
     - destination_id
     - travel_time_minutes
+  optional:
+    - territory_ear
+    - housing
+    - latitude
+    - longitude
+    - compatibility_allowed
+
+data_preparation:
+  optional: true
+  description: Parametres du workflow prepare-data; ils ne sont pas lus par le solveur.
+  fields:
+    input_dir: Dossier des fichiers bruts.
+    output_dir: Dossier des CSV propres produits.
+    raw_files:
+      optional:
+        - input_dir
+        - communes_file
+        - travel_times_file
+        - coordinates_file
+    raw_columns:
+      optional:
+        - coordinate_commune_id
+        - latitude
+        - longitude
+    communes:
+      required: [file, output]
+      optional: [sheet, columns, category_mapping]
+    travel_times:
+      required: [file, output]
+      optional: [sheet, format, origin_column]
+      supported_formats: [wide_matrix]
+    coordinates:
+      optional: true
+      fields:
+        file: Fichier optionnel de coordonnees.
+        sheet: Feuille optionnelle pour les fichiers tableurs.
+        crs: Information documentaire; aucune reprojection n'est faite en preparation.
+        columns: Mapping des colonnes code commune, nom, latitude, longitude.
+        output: Meme fichier communes propre enrichi.
+    compatibilities:
+      optional: true
+      fields:
+        file: Fichier optionnel de compatibilites.
+        output: CSV propre de compatibilites si une source existe.
+        default_when_absent: Valeur documentaire; le modele pose b_ij=1 si aucun fichier n'est charge.
+
 parameters:
   required:
     - T
@@ -24,6 +85,18 @@ parameters:
     - pivot_slots
     - objective_weights
     - eligibility_costs
+  nested:
+    formation_budgets:
+      required: [B, f, k]
+    cc_count:
+      required: [threshold_population, below_or_equal, above]
+    pivot_slots:
+      required: [M_PC, M_TPC]
+    objective_weights:
+      required: [w_t, w_e, w_m]
+    eligibility_costs:
+      required: [infinity, population_bands]
+      population_bands_required: [min, max, e_PC, e_TPC]
   invariants:
     - T > 0
     - 0 < L <= Q
@@ -34,3 +107,50 @@ parameters:
     - objective_weights.w_t > 0
     - objective_weights.w_e > 0
     - objective_weights.w_m > 0
+
+solver:
+  optional: true
+  fields:
+    time_limit_seconds: Limite de temps CP-SAT en secondes.
+    num_workers: Nombre de workers CP-SAT.
+    random_seed: Graine aleatoire CP-SAT optionnelle.
+    log_search_progress: Active les logs de recherche CP-SAT.
+
+relaxation:
+  optional: true
+  description: Parametres du workflow solve-relaxed.
+  fields:
+    enabled: Active ou non les niveaux apres la configuration initiale.
+    w_m_values: Valeurs candidates du poids de mixite.
+    tpc_eligibility_cost_factors: Facteurs de reduction des couts e_TPC.
+    T_increase_factors: Facteurs d'augmentation du seuil T.
+    L_decrease_steps: Pas de reduction du remplissage minimal L.
+    minimum_L: Borne basse optionnelle pour L.
+    Q_increase_steps: Pas d'augmentation de la capacite Q.
+    budget_increase_steps: Pas d'augmentation coherente de f, k et B.
+    allow_replace_large_costs: Autorise le remplacement final des couts tres eleves.
+    large_cost_threshold: Seuil identifiant les couts tres eleves.
+    large_cost_replacement: Penalite finie utilisee en remplacement.
+
+exports:
+  optional: true
+  fields:
+    output_dir: Racine des exports.
+    write_csv: Indicateur documentaire; les CSV principaux sont produits par export_solution.
+    write_xlsx: Indicateur documentaire; l'ecriture XLSX depend de openpyxl disponible localement.
+    write_markdown_report: Indicateur documentaire; le rapport Markdown est produit par export_solution.
+    alerts:
+      required:
+        - capacity_close_ratio
+        - low_fill_ratio
+        - travel_close_ratio
+        - high_tpc_mix_ratio
+        - high_eligibility_cost
+        - population_dispersion_ratio
+
+map_export:
+  derived_from: exports
+  description: >
+    La carte HTML est controlee par les donnees de solution validee, les
+    coordonnees des communes et exports.output_dir. Il n'existe pas de section
+    YAML dediee a la carte dans la configuration actuelle.

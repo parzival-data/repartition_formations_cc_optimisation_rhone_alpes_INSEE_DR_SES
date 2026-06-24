@@ -7,8 +7,13 @@ La resolution cible suit quatre etapes.
 Avant tout appel solveur, le projet doit identifier :
 
 - les communes sans pivot atteignable ;
-- les communes PC sans pivot atteignable pouvant porter une formation PC ;
-- les zones TPC isolees qui peuvent necessiter un pivot promu.
+- les communes PC sans pivot atteignable et compatible pour une session PC ;
+- la borne minimale de formations au regard du volume total de CC et de `Q` ;
+- la coherence declarative des budgets.
+
+Le diagnostic actuel ne calcule pas explicitement des zones TPC isolees. Les
+cas TPC difficiles sont observes indirectement via les communes orphelines, les
+trajets admissibles et les resultats du solveur.
 
 ## Construction du modele
 
