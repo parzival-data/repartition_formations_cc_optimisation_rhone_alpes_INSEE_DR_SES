@@ -163,14 +163,14 @@ variable d'ouverture vaut `1`.
 
 ## 5. Parametres metier
 
-Le nombre de coordonnateurs communaux a former pour une commune `i` depend de
-sa population :
+On note `p_i` la population de la commune `i`. Le nombre de coordonnateurs
+communaux a former depend de cette population :
 
 $$
 q_i =
 \begin{cases}
-1 & \text{si } \operatorname{pop}(i) \leq 5000,\\
-2 & \text{si } \operatorname{pop}(i) > 5000.
+1 & \text{si } p_i \leq 5000,\\
+2 & \text{si } p_i > 5000.
 \end{cases}
 $$
 
@@ -313,7 +313,7 @@ le cout d'eligibilite des pivots et la mixite residuelle.
 La composante de trajet est :
 
 $$
-\operatorname{Obj}_{trajet}
+O_{trajet}
 =
 \sum_{i \in C}
 \sum_{(j,m)\in S}
@@ -327,7 +327,7 @@ seul CC.
 La composante d'eligibilite est :
 
 $$
-\operatorname{Obj}_{eligibilite}
+O_{eligibilite}
 =
 \sum_{(j,m)\in S}
 \left[
@@ -344,7 +344,7 @@ vaut `e_j^{PC}`. Si elle est TPC, alors `z_jm = 1`, et l'expression vaut
 La composante de mixite est :
 
 $$
-\operatorname{Obj}_{mixite}
+O_{mixite}
 =
 \sum_{(j,m)\in S}
 d_{jm}
@@ -357,11 +357,11 @@ L'objectif global est :
 $$
 \min
 \quad
-w_t \operatorname{Obj}_{trajet}
+w_t O_{trajet}
 +
-w_e \operatorname{Obj}_{eligibilite}
+w_e O_{eligibilite}
 +
-w_m \operatorname{Obj}_{mixite}
+w_m O_{mixite}
 $$
 
 La formulation est lineaire : chaque terme est une constante multipliee par une
@@ -672,11 +672,13 @@ $$
 \sum_{i\in C}
 \sum_{j\in F}
 M_j
-\mathbf{1}_{a_{ij}=1}
-\mathbf{1}_{b_{ij}=1}
+I_{a_{ij}=1}
+I_{b_{ij}=1}
 $$
 
 Cette formule explique pourquoi le seuil de trajet `T` a un effet important.
+Dans cette notation, `I_condition` vaut `1` si la condition est vraie et `0`
+sinon.
 Augmenter `T` augmente souvent le nombre de couples admissibles et donc le
 nombre de variables. Le probleme peut devenir plus facile a rendre faisable,
 mais plus difficile a optimiser. Reduire `T` a l'effet inverse : le modele est
