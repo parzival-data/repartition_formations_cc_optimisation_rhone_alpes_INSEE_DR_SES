@@ -121,7 +121,7 @@ cc-formation-optimizer show-config --config config/config_ear2027.yaml
 Affiche les principaux parametres metier : `T`, `Q`, `L`, `B`, `f`, `k`,
 `M_PC` et `M_TPC`.
 
-### Preparer les donnees reelles
+### (OPTION a ne pas utiliser tous le temps) Preparer les donnees reelles
 
 ```bash
 cc-formation-optimizer prepare-data --config config/config_ear2027.yaml --input-dir donnee_brut_EAR27 --output-dir data/processed --report
