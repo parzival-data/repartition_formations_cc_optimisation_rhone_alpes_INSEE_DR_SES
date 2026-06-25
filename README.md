@@ -149,7 +149,7 @@ Charge les donnees propres, construit les parametres derives et affiche les
 volumes, la borne minimale de formations, les trajets admissibles et les alertes
 pre-resolution.
 
-### Resoudre strictement le modele
+### (ATTENTION cela ne renvoi aucun résultat) Resoudre strictement le modele
 
 ```bash
 cc-formation-optimizer solve --config config/config_ear2027.yaml
