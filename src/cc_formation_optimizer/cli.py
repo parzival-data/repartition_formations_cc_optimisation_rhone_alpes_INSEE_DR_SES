@@ -13,6 +13,7 @@ from cc_formation_optimizer.export import ExportError, export_solution
 from cc_formation_optimizer.map_export import MapExportError, export_solution_map, render_map_from_exports
 from cc_formation_optimizer.model_builder import build_model
 from cc_formation_optimizer.parameters import build_derived_parameters
+from cc_formation_optimizer.business_postprocess import PostprocessError, postprocess_business_rules
 from cc_formation_optimizer.relaxation import export_relaxation_reports, run_relaxation_workflow
 from cc_formation_optimizer.solution_extractor import SolutionExtractionError, extract_solution
 from cc_formation_optimizer.solver import solve_model
@@ -61,6 +62,25 @@ def build_parser() -> argparse.ArgumentParser:
     render_map.add_argument("--assignments", type=Path, default=None, help="CSV communes affectees existant.")
     render_map.add_argument("--stats", type=Path, default=None, help="JSON statistiques solution existant.")
     render_map.add_argument("--output", type=Path, default=None, help="Fichier HTML de sortie.")
+
+    postprocess = subparsers.add_parser(
+        "postprocess-business-rules",
+        help="Analyse les exports existants et produit des propositions metier post-optimisation.",
+    )
+    postprocess.add_argument("--config", type=Path, default=Path("config/config_ear2027.yaml"))
+    postprocess.add_argument("--input-dir", type=Path, default=Path("outputs"), help="Racine contenant solutions/.")
+    postprocess.add_argument(
+        "--output-dir",
+        type=Path,
+        default=None,
+        help="Dossier des CSV de propositions. Par defaut: <input-dir>/postprocess.",
+    )
+    postprocess.add_argument(
+        "--min-travel-time-gain-min",
+        type=int,
+        default=5,
+        help="Gain minimal en minutes pour proposer un rattachement a un autre pivot de meme type.",
+    )
 
     return parser
 
@@ -165,6 +185,25 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Carte: {map_result.html_path}")
         print(f"Points cartographies: {map_result.mapped_points}")
         print(f"Communes sans coordonnees: {map_result.missing_coordinates}")
+        print("Solveur: non relance")
+        return 0
+
+    if args.command == "postprocess-business-rules":
+        try:
+            result = postprocess_business_rules(
+                input_dir=args.input_dir,
+                config=config,
+                output_dir=args.output_dir,
+                min_travel_time_gain_min=args.min_travel_time_gain_min,
+            )
+        except (DataLoadingError, PostprocessError, ValueError) as exc:
+            parser.exit(status=2, message=f"Erreur de post-traitement metier: {exc}\n")
+
+        print("Business post-processing completed.")
+        print(f"Proposals written to: {result.proposals_csv}")
+        print(f"Summary written to: {result.summary_csv}")
+        print("Original optimization exports were not modified.")
+        print(f"Number of proposals: {result.proposal_count}")
         print("Solveur: non relance")
         return 0
 
