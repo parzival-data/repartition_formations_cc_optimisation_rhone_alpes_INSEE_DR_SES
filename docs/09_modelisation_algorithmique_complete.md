@@ -313,7 +313,7 @@ le cout d'eligibilite des pivots et la mixite residuelle.
 La composante de trajet est :
 
 $$
-O_{trajet}
+O_{\text{trajet}}
 =
 \sum_{i \in C}
 \sum_{(j,m)\in S}
@@ -327,7 +327,7 @@ seul CC.
 La composante d'eligibilite est :
 
 $$
-O_{eligibilite}
+O_{\text{eligibilite}}
 =
 \sum_{(j,m)\in S}
 \left[
@@ -344,7 +344,7 @@ vaut `e_j^{PC}`. Si elle est TPC, alors `z_jm = 1`, et l'expression vaut
 La composante de mixite est :
 
 $$
-O_{mixite}
+O_{\text{mixite}}
 =
 \sum_{(j,m)\in S}
 d_{jm}
@@ -357,11 +357,11 @@ L'objectif global est :
 $$
 \min
 \quad
-w_t O_{trajet}
+w_t O_{\text{trajet}}
 +
-w_e O_{eligibilite}
+w_e O_{\text{eligibilite}}
 +
-w_m O_{mixite}
+w_m O_{\text{mixite}}
 $$
 
 La formulation est lineaire : chaque terme est une constante multipliee par une
