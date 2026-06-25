@@ -307,8 +307,8 @@ Voir [`docs/11_surcouche_metier_post_optimisation.md`](docs/11_surcouche_metier_
   version LaTeX autonome de la modelisation algorithmique.
 - [`docs/09_modelisation_algorithmique_complete.pdf`](docs/09_modelisation_algorithmique_complete.pdf) :
   version PDF compilee.
-- [`docs/10_resume_passation_ia.md`](docs/10_resume_passation_ia.md) :
-  synthese de passation pour reprendre le projet.
+- [`docs/10_contexte_llm.md`](docs/10_contexte_llm.md) :
+  contexte technique structure pour reprise par un LLM.
 - [`docs/11_surcouche_metier_post_optimisation.md`](docs/11_surcouche_metier_post_optimisation.md) :
   documentation dediee a la surcouche metier.
 
