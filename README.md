@@ -281,7 +281,16 @@ Voir [`docs/11_surcouche_metier_post_optimisation.md`](docs/11_surcouche_metier_
 - `src/cc_formation_optimizer/` : package Python principal.
 - `src/cc_formation_optimizer/business_postprocess/` : surcouche métier
   post-optimisation.
+- `travel_time_core/` : sous-projet independant de generation des matrices de
+  temps ; il communique avec l'optimiseur uniquement par fichiers CSV/ODS.
 - `tests/` : tests automatisés et fixtures.
+
+## Generation des matrices de temps
+
+Le dossier `travel_time_core/` contient un sous-projet independant permettant de
+produire les matrices de temps de trajet. Il peut exporter un
+`temps_trajet_clean.csv` compatible avec l'optimiseur, sans import Python direct
+entre les deux projets. Voir [`travel_time_core/README.md`](travel_time_core/README.md).
 
 ## Documentation détaillée
 

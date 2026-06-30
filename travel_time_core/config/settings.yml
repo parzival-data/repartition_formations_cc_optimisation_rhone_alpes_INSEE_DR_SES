@@ -1,0 +1,58 @@
+input:
+  format: "csv"
+  communes_csv_path: "data/input/communes.csv"
+  default_ods_path: "data/input/villes.ods"
+  sheet_name: null
+
+columns:
+  code_commune: "code_commune"
+  nom_commune: "nom_commune"
+  categorie: "categorie"
+  latitude: "latitude"
+  longitude: "longitude"
+  population: "population"
+  territoire: "territoire_EAR"
+
+database:
+  sqlite_path: "data/cache/travel_times.sqlite"
+
+geocode:
+  base_url: "https://geo.api.gouv.fr"
+  timeout_sec: 20
+  rate_limit_per_sec: 5.0
+
+ign:
+  get_capabilities_url: "https://data.geopf.fr/navigation/getCapabilities"
+  route_url: "https://data.geopf.fr/navigation/itineraire"
+  resource: "bdtopo-osrm"
+  profile: "car"
+  optimization: "fastest"
+  distance_unit: "meter"
+  time_unit: "second"
+  crs: "EPSG:4326"
+  get_steps: false
+  get_bbox: false
+  timeout_sec: 30
+  rate_limit_per_sec: 4.5
+  max_retries: 3
+  backoff_initial_sec: 1.0
+  debug_raw_responses: false
+  api_key: null
+
+candidates:
+  k_default: 150
+  k_pc: 120
+  k_tpc: 100
+
+runtime:
+  mode: "offline"
+  allow_network: false
+  max_couples: null
+  offline_speed_kmh: 55.0
+  offline_distance_factor: 1.25
+
+output:
+  directory: "data/output"
+  compatible_csv_path: "data/output/temps_trajet_clean.csv"
+  report_json_path: "data/output/generation_report.json"
+  thresholds_minutes: [60, 75, 90, 120]

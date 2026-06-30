@@ -1,0 +1,30 @@
+input:
+  format: "csv"
+  communes_csv_path: "communes_minimal.csv"
+  default_ods_path: "data/input/villes.ods"
+  sheet_name: null
+columns:
+  code_commune: "code_commune"
+  nom_commune: "nom_commune"
+  categorie: "categorie"
+  latitude: "latitude"
+  longitude: "longitude"
+  population: "population"
+  territoire: "territoire_EAR"
+database:
+  sqlite_path: "data/cache/test_travel_times.sqlite"
+candidates:
+  k_default: 2
+  k_pc: 2
+  k_tpc: 2
+runtime:
+  mode: "offline"
+  allow_network: false
+  max_couples: 4
+  offline_speed_kmh: 60
+  offline_distance_factor: 1.2
+output:
+  directory: "data/output"
+  compatible_csv_path: "data/output/temps_trajet_clean.csv"
+  report_json_path: "data/output/generation_report.json"
+  thresholds_minutes: [60, 75, 90, 120]

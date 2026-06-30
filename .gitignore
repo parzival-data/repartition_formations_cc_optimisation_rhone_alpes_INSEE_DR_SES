@@ -18,3 +18,13 @@ outputs/**/*.log
 outputs/**/*.html
 outputs/**/*.json
 outputs/**/*.yaml
+travel_time_core/data/cache/*
+!travel_time_core/data/cache/.gitkeep
+travel_time_core/data/output/*
+!travel_time_core/data/output/.gitkeep
+travel_time_core/data/input/*
+!travel_time_core/data/input/.gitkeep
+travel_time_core/cache/*
+travel_time_core/.cache/*
+travel_time_core/outputs/*
+travel_time_core/**/*.log
