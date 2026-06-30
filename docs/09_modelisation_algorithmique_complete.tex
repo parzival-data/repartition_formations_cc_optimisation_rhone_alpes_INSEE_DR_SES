@@ -24,6 +24,7 @@
 \setlist[enumerate]{leftmargin=1.6em}
 \setlength{\emergencystretch}{3em}
 \setcounter{secnumdepth}{0}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
 \sloppy
 
 \hypersetup{
@@ -228,7 +229,7 @@ Toutes les compatibilités sont alors autorisées par défaut. Si un fichier est
 
 Les autres paramètres métier structurants sont :
 
-\begin{longtable}{|p{0.28\textwidth}|p{0.62\textwidth}|}
+\begin{longtable}{|L{0.28\textwidth}|L{0.62\textwidth}|}
 \hline
 Paramêtre & Signification \\
 \hline
@@ -501,27 +502,7 @@ Si la session est TPC, \texttt{z\_jm = 1} et \texttt{n\_\{jm\}\textasciicircum{}
 
 \section{9. Fonctionnement interne de CP-SAT et justification du paramétrage}
 
-Cette partie décrit ce qui se passe entre la formulation mathématique précédente et la solution extraite par le code. Elle remplace les anciennes parties diagnostic, résolution et extraction par une lecture plus centrée sur le solveur CP-SAT, les paramètres actuels de config\_ear2027.yaml et le rôle des poids de l'objectif.
-
-Sources utilisées pour cette partie :
-
-\begin{itemize}
-\item documentation OR-Tools, "CP-SAT Solver" :
-<https://developers.google.com/optimization/cp/cp\_solver> ;
-
-\item documentation OR-Tools, "Setting solver limits" :
-<https://developers.google.com/optimization/cp/cp\_tasks> ;
-
-\item Daniel Krupke, "The CP-SAT Primer", chapitre "Under the hood" :
-<https://d-krupke.github.io/cpsat-primer/under\_the\_hood.html> ;
-
-\item Ohrimenko, Stuckey et Codish, "Propagation via Lazy Clause Generation" :
-<https://doi.org/10.1007/s10601-009-9088-0> ;
-
-\item Schutt, Feydy, Stuckey et Wallace, "Solving the Resource Constrained Project
-Scheduling Problem with Generalized Precedences by Lazy Clause Generation" : <https://arxiv.org/abs/1009.0347>.
-
-\end{itemize}
+Cette partie décrit ce qui se passe entre la formulation mathématique précédente et la solution extraite par le code. Elle remplace les anciennes parties diagnostic, résolution et extraction par une lecture plus centrée sur le solveur CP-SAT, les paramètres actuels de config\_ear2027.yaml et le rôle des poids de l'objectif. Elle s'appuie sur la documentation OR-Tools et sur des références relatives à CP-SAT et à la Lazy Clause Generation \cite{ortools-cpsat,ortools-limits,krupke-cpsat-primer,ohrimenko-lcg,schutt-rcpsp-lcg}.
 
 \subsection{9.1 Nature du solveur CP-SAT}
 
@@ -581,7 +562,7 @@ C'est pourquoi une solution FEASIBLE est exploitable mais pas optimale au sens m
 
 Les paramètres solveur de config\_ear2027.yaml sont :
 
-\begin{longtable}{|p{0.24\textwidth}|p{0.18\textwidth}|p{0.48\textwidth}|}
+\begin{longtable}{|L{0.24\textwidth}|L{0.18\textwidth}|L{0.48\textwidth}|}
 \hline
 Paramètre & Valeur actuelle & Justification \\
 \hline
@@ -604,7 +585,7 @@ La graine random\_seed: 1 ne rend pas tous les comportements parallèles stricte
 
 Les paramètres métier actuellement utilisés sont :
 
-\begin{longtable}{|p{0.24\textwidth}|p{0.18\textwidth}|p{0.48\textwidth}|}
+\begin{longtable}{|L{0.24\textwidth}|L{0.18\textwidth}|L{0.48\textwidth}|}
 \hline
 Paramètre & Valeur actuelle & Rôle dans le modèle \\
 \hline
@@ -647,7 +628,7 @@ Les slots M\_PC: 3 et M\_TPC: 1 traduisent une asymétrie métier. Une commune P
 
 Les coûts d'éligibilité configurés par bande de population sont :
 
-\begin{longtable}{|p{0.20\textwidth}|p{0.14\textwidth}|p{0.14\textwidth}|p{0.40\textwidth}|}
+\begin{longtable}{|L{0.20\textwidth}|L{0.14\textwidth}|L{0.14\textwidth}|L{0.40\textwidth}|}
 \hline
 Population du pivot & e\_PC & e\_TPC & Interprétation \\
 \hline
@@ -670,7 +651,7 @@ Les coûts TPC sont plus faibles que les coûts PC dans les petites bandes. Cela
 
 Les poids actuels sont :
 
-\begin{longtable}{|p{0.24\textwidth}|p{0.18\textwidth}|p{0.48\textwidth}|}
+\begin{longtable}{|L{0.24\textwidth}|L{0.18\textwidth}|L{0.48\textwidth}|}
 \hline
 Poids & Valeur actuelle & Composante \\
 \hline
@@ -714,7 +695,7 @@ Cet ordre est cohérent avec une lecture métier où la solution doit d'abord ê
 
 À la fin de la recherche, CP-SAT retourne un statut et des valeurs de variables. Les statuts utiles sont :
 
-\begin{longtable}{|p{0.28\textwidth}|p{0.62\textwidth}|}
+\begin{longtable}{|L{0.28\textwidth}|L{0.62\textwidth}|}
 \hline
 Statut & Interprétation opérationnelle \\
 \hline
@@ -774,7 +755,7 @@ La contrainte interdisant les communes PC dans une session TPC n'est jamais rel�
 
 Une solution validée peut être restituee sous plusieurs formes :
 
-\begin{longtable}{|p{0.28\textwidth}|p{0.62\textwidth}|}
+\begin{longtable}{|L{0.34\textwidth}|L{0.56\textwidth}|}
 \hline
 Fichier & Rôle \\
 \hline
@@ -829,7 +810,7 @@ Il faut enfin distinguer trouver une solution faisable et prouver son optimalit�
 
 \section{15. Correspondance code / mathématiques}
 
-\begin{longtable}{|p{0.24\textwidth}|p{0.18\textwidth}|p{0.48\textwidth}|}
+\begin{longtable}{|L{0.24\textwidth}|L{0.18\textwidth}|L{0.48\textwidth}|}
 \hline
 Element & Signification & Fichier \\
 \hline
@@ -896,5 +877,31 @@ L'outil produit une solution d'affectation en combinant une préparation de donn
 La validation algorithmique garantit que la solution extraite respecte les contraintes codees. Elle ne remplace pas l'analyse humaine des alertes, des choix de pénalités, des pivots retenus et des conditions opérationnelles non modélisées. Les exports et la carte servent donc à qualifier la solution et à faciliter la revue métier.
 
 Ce document constitue la référence pour comprendre comment les objets du code, les notations mathématiques et les fichiers produits s'articulent dans l'implementation actuelle.
+
+\section{Bibliographie}
+
+\begin{thebibliography}{9}
+
+\bibitem{ortools-cpsat}
+Google OR-Tools, \emph{CP-SAT Solver}.
+\url{https://developers.google.com/optimization/cp/cp_solver}
+
+\bibitem{ortools-limits}
+Google OR-Tools, \emph{Setting solver limits}.
+\url{https://developers.google.com/optimization/cp/cp_tasks}
+
+\bibitem{krupke-cpsat-primer}
+Daniel Krupke, \emph{The CP-SAT Primer}, chapitre \emph{Under the hood}.
+\url{https://d-krupke.github.io/cpsat-primer/under_the_hood.html}
+
+\bibitem{ohrimenko-lcg}
+Ohrimenko, Stuckey et Codish, \emph{Propagation via Lazy Clause Generation}.
+\url{https://doi.org/10.1007/s10601-009-9088-0}
+
+\bibitem{schutt-rcpsp-lcg}
+Schutt, Feydy, Stuckey et Wallace, \emph{Solving the Resource Constrained Project Scheduling Problem with Generalized Precedences by Lazy Clause Generation}.
+\url{https://arxiv.org/abs/1009.0347}
+
+\end{thebibliography}
 
 \end{document}
