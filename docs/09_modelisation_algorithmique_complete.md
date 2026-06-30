@@ -512,93 +512,306 @@ Si la session est TPC, `z_jm = 1` et `n_{jm}^{T} - Qz_{jm}` est inferieur ou
 session est PC, `z_jm = 0` et `d_jm` mesure le nombre de CC TPC places dans une
 session PC.
 
-## 9. Diagnostic pré-résolution
+## 9. Fonctionnement interne de CP-SAT et justification du paramétrage
 
-Le diagnostic pré-résolution signale des problèmes structuréls avant l'appel au
-solveur. Il ne prouve pas la faisabilité, mais il permet d'identifier rapidement
-des causes probables d'échec.
+Cette partie décrit ce qui se passe entre la formulation mathématique précédente
+et la solution extraite par le code. Elle remplace les anciennes parties
+diagnostic, résolution et extraction par une lecture plus centrée sur le solveur
+CP-SAT, les paramètres actuels de config_ear2027.yaml et le rôle des poids de
+l'objectif.
 
-Les contrôles actuels portent notamment sur les communes sans pivot admissible,
-les communes PC sans pivot compatible permettant une session PC, le volume total
-de CC, le nombre de slots candidats et le nombre de trajets admissibles.
+Sources utilisées pour cette partie :
 
-Une borne minimale du nombre de formations est calculée à partir de la capacité
-maximale :
+- documentation OR-Tools, "CP-SAT Solver" :
+  <https://developers.google.com/optimization/cp/cp_solver> ;
+- documentation OR-Tools, "Setting solver limits" :
+  <https://developers.google.com/optimization/cp/cp_tasks> ;
+- Daniel Krupke, "The CP-SAT Primer", chapitre "Under the hood" :
+  <https://d-krupke.github.io/cpsat-primer/under_the_hood.html> ;
+- Ohrimenko, Stuckey et Codish, "Propagation via Lazy Clause Generation" :
+  <https://doi.org/10.1007/s10601-009-9088-0> ;
+- Schutt, Feydy, Stuckey et Wallace, "Solving the Resource Constrained Project
+  Scheduling Problem with Generalized Precedences by Lazy Clause Generation" :
+  <https://arxiv.org/abs/1009.0347>.
 
-$$
-B_{\min}
-=
-\left\lceil
-\frac{\sum_{i\in C} q_i}{Q}
-\right\rceil
-$$
+### 9.1 Nature du solveur CP-SAT
 
-Cette borne indique le nombre minimal de sessions nécessaires si l'on ne regarde
-que le volume total de CC et la capacité `Q`. Elle ne tient pas compte des
-trajets, des compatibilités, des catégories ou des budgets par type ; elle reste
-donc une alerte simple, pas une preuve complété.
+CP-SAT est le solveur de programmation par contraintes d'OR-Tools pour des
+modèles entiers. La documentation OR-Tools insiste sur un point structurant :
+les variables et les contraintes doivent être exprimées avec des entiers. Le
+modèle de ce projet respecte cette contrainte : les variables x, y et z sont
+booléennes, la variable d est entière, les temps de trajet sont en minutes
+entières et les pénalités sont des constantes entières.
 
-Le diagnostic vérifie aussi la cohérence de `B`, `f` et `k`, ainsi que la
-disponibilité des coordonnées pour la carte. Il ne calculé pas explicitement des
-zones TPC isolées ; ces cas sont observes indirectement via les communes
-orphelines, les trajets admissibles et les résultats du solveur.
+Le solveur n'exécute pas une recherche gloutonne du type "prendre le plus proche
+pivot". Il reçoit un modèle global : toutes les contraintes d'affectation, de
+capacité, de budget, de type de session et de mixité sont présentes en même
+temps. CP-SAT cherche alors une affectation complète qui respecte toutes les
+contraintes dures, puis minimise l'objectif pondéré.
 
-## 10. Résolution CP-SAT
+Le caractère entier est important pour l'interprétation des poids. Une
+augmentation de 1000 dans l'objectif n'est pas une probabilité ou un score flou :
+c'est une unité objective entière que le solveur compare exactement aux autres
+composantes. Le paramétrage doit donc être lu comme une hiérarchie numérique
+entre arbitrages métier.
 
-Le modèle est resolu avec OR-Tools CP-SAT. Ce solveur cherche une affectation
-entière qui respecte toutes les contraintes dures, puis minimise l'objectif
-pondéré.
+### 9.2 Transformation interne du modèle
 
-La configuration transmet au solveur les paramètres opérationnels suivants :
-temps limite, nombre de workers, graine aléatoire et activation eventuelle des
-logs. Le nombre de workers peut accelerer la recherche, mais il ne change pas le
-modèle mathématique.
+Le code construit un CpModel avec des variables et des contraintes linéaires.
+Avant la recherche principale, CP-SAT valide le modèle et applique une phase de
+présolve. Cette phase cherche à simplifier le problème sans changer l'ensemble
+des solutions valides : suppression de variables inutiles, resserrement de
+domaines, détection de contraintes redondantes, substitutions et propagation
+des implications déjà évidentes.
 
-Les principaux statuts sont :
+Dans ce projet, plusieurs choix aident le présolve :
 
-| Statut | Interprétation |
+- les variables x_ijm ne sont créées que pour les trajets admissibles et les
+  compatibilités autorisées ;
+- les couples sans trajet ou au-delà de T sont absents du modèle, au lieu d'être
+  présents avec une très forte pénalité ;
+- la contrainte d'ordre y_{j,m+1} <= y_{jm} supprime une partie des symétries
+  entre slots d'un même pivot PC ;
+- les budgets séparés PC et TPC bornent directement le nombre de sessions que le
+  solveur peut ouvrir.
+
+Le présolve ne remplace pas les diagnostics métier. Il travaille sur le modèle
+formel transmis à CP-SAT. Les diagnostics du code restent utiles avant l'appel
+au solveur pour signaler des communes sans pivot admissible, une incohérence de
+budget ou un risque de capacité insuffisante. En revanche, la preuve finale de
+faisabilité ou d'infaisabilité appartient au solveur.
+
+### 9.3 Propagation, conflits et Lazy Clause Generation
+
+CP-SAT combine des techniques de programmation par contraintes, de satisfiabilité
+booléenne et d'optimisation entière. La logique centrale est proche de la Lazy
+Clause Generation décrite dans les articles cités : les propagateurs de
+contraintes réduisent les domaines possibles ; lorsqu'une contradiction est
+rencontrée, le solveur produit une clause expliquant le conflit ; cette clause
+est apprise pour éviter de refaire la même erreur plus tard dans la recherche.
+
+Dans le modèle EAR 2027, une décision locale peut produire beaucoup
+d'implications. Par exemple, si une session z_jm est déclarée TPC, toutes les
+variables x_ijm des communes PC vers cette session doivent rester à 0. Si une
+session est fermée, toutes les affectations vers elle sont impossibles. Si une
+session est presque pleine, les affectations restantes qui dépasseraient Q
+deviennent impossibles.
+
+La propagation permet donc de couper des branches avant de tester une solution
+complète. L'apprentissage de clauses ajoute une mémoire de recherche : après un
+conflit, CP-SAT conserve une explication logique qui empêche de revenir vers une
+combinaison équivalente. C'est une des raisons pour lesquelles la formulation
+linéaire, entière et sans produit entre variables est préférable ici : elle donne
+au solveur des contraintes exploitables directement.
+
+### 9.4 Recherche parallèle et amélioration des solutions
+
+CP-SAT peut utiliser plusieurs travailleurs de recherche. Avec num_workers: 8,
+la configuration autorise huit workers. Ils ne changent pas le modèle
+mathématique ; ils diversifient la recherche, les heuristiques et les preuves
+sur la même formulation. Ce choix est adapté à un problème d'affectation
+combinatoire où trouver une première solution et prouver sa qualité peuvent
+avoir des difficultés différentes.
+
+Le solveur travaille avec deux objectifs complémentaires :
+
+- trouver rapidement une solution faisable respectant toutes les contraintes ;
+- améliorer cette solution ou prouver qu'aucune solution de meilleur coût
+  n'existe.
+
+C'est pourquoi une solution FEASIBLE est exploitable mais pas optimale au sens
+mathématique. Elle respecte les contraintes, mais le solveur n'a pas démontré
+qu'elle est la meilleure possible dans le temps alloué. Une solution OPTIMAL
+ajoute cette preuve. Un statut INFEASIBLE signifie que CP-SAT a prouvé l'absence
+de solution sous les contraintes actuelles. Un statut UNKNOWN signifie que les
+limites de recherche ont été atteintes ou qu'aucune conclusion exploitable n'a
+été produite.
+
+### 9.5 Paramètres solveur actuels
+
+Les paramètres solveur de config_ear2027.yaml sont :
+
+| Paramètre | Valeur actuelle | Justification |
+| --- | ---: | --- |
+| time_limit_seconds | 2400 | limite de 40 minutes ; elle évite une exécution non bornée tout en laissant au solveur le temps de trouver une solution et d'améliorer la preuve |
+| num_workers | 8 | exploite le parallélisme disponible pour diversifier la recherche CP-SAT sans modifier le modèle |
+| random_seed | 1 | stabilise les décisions pseudo-aléatoires pour rendre les comparaisons de runs plus reproductibles |
+| log_search_progress | true | conserve une trace exploitable de la progression, utile pour distinguer absence de solution, manque de temps et lenteur de preuve |
+
+La limite de temps est cohérente avec la documentation OR-Tools, qui recommande
+de borner la recherche pour garantir que le programme termine dans un délai
+raisonnable. Ici, 2400 secondes est un compromis opérationnel : assez long pour
+un modèle départemental ou régional dense, mais suffisamment borné pour rester
+auditable.
+
+La graine random_seed: 1 ne rend pas tous les comportements parallèles
+strictement bit à bit identiques sur toutes les machines. Elle fixe toutefois la
+part pseudo-aléatoire contrôlable et permet de comparer plus proprement deux
+configurations proches. Les logs activés sont justifiés car le statut final seul
+ne suffit pas toujours à diagnostiquer un modèle combinatoire : l'évolution des
+bornes, des conflits et des solutions intermédiaires donne une information
+utile.
+
+### 9.6 Paramètres métier actuels
+
+Les paramètres métier actuellement utilisés sont :
+
+| Paramètre | Valeur actuelle | Rôle dans le modèle |
+| --- | ---: | --- |
+| T | 75 | temps maximal admissible entre une commune et son pivot |
+| Q | 14 | capacité maximale d'une session en nombre de CC |
+| L | 6 | remplissage minimal d'une session ouverte |
+| B | 55 | budget total déclaré de sessions |
+| f | 45 | budget maximal de sessions PC |
+| k | 10 | budget maximal de sessions TPC |
+| threshold_population | 5000 | seuil au-dessus duquel une commune compte pour deux CC |
+| below_or_equal | 1 | nombre de CC pour une commune de population inférieure ou égale au seuil |
+| above | 2 | nombre de CC pour une commune au-dessus du seuil |
+| M_PC | 3 | nombre maximal de slots candidats pour un pivot PC |
+| M_TPC | 1 | nombre maximal de slots candidats pour un pivot TPC |
+
+Le seuil T: 75 est un choix structurant : il retire du modèle tous les couples
+commune-pivot au-delà de 75 minutes. Cette valeur contrôle à la fois la
+faisabilité et la taille du modèle. Un seuil plus bas réduirait le nombre de
+variables x, mais augmenterait le risque de communes sans affectation. Un seuil
+plus haut rendrait davantage d'affectations possibles, mais élargirait la
+recherche.
+
+La capacité Q: 14 et le remplissage minimal L: 6 encadrent les sessions ouvertes.
+Le rapport entre les deux laisse une marge réelle de composition des groupes :
+une session n'est pas ouverte pour un effectif marginal, mais elle peut accueillir
+des combinaisons de communes de tailles différentes. Le solveur peut ainsi
+arbitrer entre proximité, type de session et remplissage.
+
+Les budgets f: 45 et k: 10 sont les contraintes directement utilisées pour
+compter les sessions PC et TPC. Le budget total B: 55 est cohérent avec B = f + k ;
+il sert de garde-fou de configuration et de lecture métier. Cette séparation est
+préférable à un seul budget global, car une solution avec trop de sessions TPC
+ou trop de sessions PC peut être indésirable même si le total reste correct.
+
+Le seuil de population à 5000 transforme la demande en nombre de coordonnateurs
+communaux à former. Les communes au-dessus de ce seuil pèsent 2 dans les
+capacités et dans l'objectif de trajet, ce qui évite de traiter une commune très
+peuplée comme une commune de faible charge.
+
+Les slots M_PC: 3 et M_TPC: 1 traduisent une asymétrie métier. Une commune PC
+peut porter jusqu'à trois sessions candidates, alors qu'une commune TPC n'en
+porte qu'une. Cette limite évite que le solveur concentre artificiellement trop
+de sessions sur un même pivot TPC et donne plus de flexibilité aux pivots PC.
+
+### 9.7 Coûts d'éligibilité actuels
+
+Les coûts d'éligibilité configurés par bande de population sont :
+
+| Population du pivot | e_PC | e_TPC | Interprétation |
+| --- | ---: | ---: | --- |
+| 1501 et plus | 0 | 0 | pivot pleinement favorable |
+| 1000 à 1500 | 100 | 50 | pivot possible, légèrement pénalisé |
+| 500 à 999 | 500 | 150 | pivot possible mais nettement moins souhaitable |
+| 0 à 499 | 1000000000 | 500 | pivot PC pratiquement exclu par pénalité ; pivot TPC encore possible mais coûteux |
+
+Ces coûts ne sont pas des contraintes dures. Ils entrent dans l'objectif via
+w_e, donc ils orientent le solveur parmi les solutions faisables. La valeur
+1000000000 joue le rôle d'une pénalité quasi interdite : elle n'empêche pas
+formellement une solution, mais elle la rend dominée sauf absence d'alternative
+dans les contraintes. C'est cohérent avec le workflow d'assouplissement, qui
+prévoit explicitement de remplacer les très grands coûts par une pénalité finie
+si cette étape est autorisée.
+
+Les coûts TPC sont plus faibles que les coûts PC dans les petites bandes. Cela
+traduit une tolérance plus grande pour des pivots TPC de taille modérée, alors
+que l'ouverture d'une session PC dans une très petite commune est très fortement
+découragée.
+
+### 9.8 Justification des poids de l'objectif
+
+Les poids actuels sont :
+
+| Poids | Valeur actuelle | Composante |
+| --- | ---: | --- |
+| w_t | 1 | temps de trajet pondéré par le nombre de CC |
+| w_e | 1000 | coûts d'éligibilité des pivots |
+| w_m | 500 | mixité résiduelle TPC dans les sessions PC |
+
+Le poids w_t: 1 conserve le trajet comme unité de base. Une minute supplémentaire
+pour une commune à un CC coûte 1 ; pour une commune à deux CC, elle coûte 2. Ce
+choix rend la composante trajet lisible : elle mesure des minutes-personnes de
+formation, avant arbitrage avec les autres dimensions.
+
+Le poids w_e: 1000 donne une priorité forte à l'éligibilité des pivots. Par
+exemple, utiliser un pivot PC de bande 1000-1500 ajoute 100 * 1000 = 100000
+unités d'objectif ; utiliser un pivot PC de bande 500-999 ajoute 500 * 1000 =
+500000. Ces ordres de grandeur dépassent largement quelques dizaines de minutes
+de trajet. Le modèle préfère donc normalement un pivot plus éligible, même si
+cela impose un trajet un peu plus long, tant que le seuil dur T reste respecté.
+
+Ce choix est justifié si l'éligibilité du pivot représente une préférence métier
+plus importante que l'optimisation fine des minutes. Il évite qu'une petite
+amélioration de trajet conduise à ouvrir des sessions dans des pivots jugés peu
+adaptés. En revanche, il faut lire les résultats en gardant cette hiérarchie en
+tête : le solveur optimise d'abord fortement la qualité des pivots, puis affine
+les trajets à l'intérieur de cette structure.
+
+Le poids w_m: 500 pénalise chaque CC TPC placé dans une session PC. Cette
+pénalité vaut l'équivalent objectif de 500 minutes-personnes de trajet. Elle est
+donc suffisamment élevée pour éviter la mixité résiduelle quand une solution TPC
+propre existe, mais elle reste inférieure à une pénalité d'éligibilité moyenne
+pondérée par w_e. Ainsi, le modèle préfère généralement ouvrir et remplir des
+sessions TPC, sans rendre impossible l'affectation de TPC en session PC lorsque
+les contraintes de trajet, de capacité ou de budget ne permettent pas mieux.
+
+L'ordre de priorité induit par les poids actuels est donc :
+
+1. respecter toutes les contraintes dures, sans exception ;
+2. éviter les pivots peu éligibles, surtout pour les sessions PC ;
+3. limiter la mixité TPC résiduelle dans les sessions PC ;
+4. minimiser les temps de trajet parmi les solutions qui satisfont ces
+   arbitrages.
+
+Cet ordre est cohérent avec une lecture métier où la solution doit d'abord être
+opérationnellement acceptable, puis géographiquement efficace. Les temps de
+trajet ne sont pas ignorés : ils départagent toutes les solutions comparables en
+éligibilité et en mixité. Ils sont simplement placés derrière les pénalités qui
+expriment les préférences structurelles du modèle.
+
+### 9.9 Lecture opérationnelle des sorties CP-SAT
+
+À la fin de la recherche, CP-SAT retourne un statut et des valeurs de variables.
+Les statuts utiles sont :
+
+| Statut | Interprétation opérationnelle |
 | --- | --- |
-| `OPTIMAL` | une solution optimale est trouvée et prouvée |
-| `FEASIBLE` | une solution faisable est trouvée, mais l'optimalité n'est pas démontrée |
-| `INFEASIBLE` | le solveur prouve qu'aucune solution ne respecte les contraintes |
-| `UNKNOWN` | le solveur n'a pas fourni de conclusion exploitable dans les limites données |
+| OPTIMAL | une solution faisable est trouvée et sa qualité optimale est prouvée |
+| FEASIBLE | une solution faisable est trouvée, sans preuve d'optimalité |
+| INFEASIBLE | aucune solution ne respecte les contraintes actuelles |
+| MODEL_INVALID | le modèle transmis au solveur est invalide |
+| UNKNOWN | le solveur s'arrête sans solution ni preuve suffisante, souvent à cause d'une limite |
 
-Une solution `FEASIBLE` respecte les contraintes. Elle ne doit pas être décrite
-comme optimale : le solveur n'a pas démontré qu'aucune meilleure solution
-n'existe.
+Le code ne doit exploiter une solution que lorsque le statut est OPTIMAL ou
+FEASIBLE. Les valeurs CP-SAT sont ensuite reconstruites en objets métier :
+sessions ouvertes, communes affectées, charges, types de session, temps de
+trajet et décomposition de l'objectif. Cette extraction reste nécessaire, car le
+solveur ne retourne que des valeurs de variables.
 
-## 11. Extraction et validation
-
-Le solveur retourne des valeurs de variables. Ces valeurs ne sont pas encore un
-livrable métier directement exploitable. Le module `solution_extractor.py`
-reconstruit d'abord des objets lisibles : sessions ouvertes, communes affectées
-et decomposition de l'objectif.
-
-L'extraction n'est lancee que pour les statuts `OPTIMAL` et `FEASIBLE`. Pour
-chaque session ouverte, elle calculé le pivot, le type de session, les chargés,
-les temps de trajet, les populations et la mixité résiduelle. Pour chaque
-commune, elle reconstruit la session retenue, le pivot, le temps de trajet, la
-catégorie, la population et le nombre de CC.
-
-Le module `validation.py` recontrôle ensuite la solution extraite en mémoire,
-avant tout export. La validation vérifie notamment l'affectation unique,
-l'existence des sessions référencées, les capacités, les budgets, l'interdiction
-des PC dans les sessions TPC, les temps de trajet, les compatibilités, la
-cohérence de `d_jm` et l'objectif recalculé.
-
-La condition opérationnelle est :
+La validation post-solution reste une étape distincte. Elle recalcule les règles
+importantes à partir de la solution extraite : affectation unique, existence des
+sessions référencées, capacités, budgets, interdiction des PC en session TPC,
+temps de trajet, compatibilités, cohérence de la mixité et objectif recalculé.
+La condition opérationnelle reste donc :
 
 $$
 \text{solution exploitable}
 \Longleftrightarrow
+\text{statut CP-SAT exploitable}
++
 \text{solution extraite}
 +
 \text{validation OK}
 $$
 
-Les exports sont produits seulement après cette validation. Relire des exports
-peut servir à l'analyse ou à la régénération de la carte, mais les exports ne
-sont pas la base de la validation initiale.
+Les exports ne sont produits qu'après cette validation. Ils servent à l'analyse
+et à la restitution, mais ils ne remplacent ni la preuve du solveur ni le
+contrôle post-solution du code.
 
 ## 12. Assouplissement hiérarchique
 
