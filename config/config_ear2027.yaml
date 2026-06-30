@@ -78,8 +78,8 @@ parameters:
   L: 6
   formation_budgets:
     B: 55
-    f: 45
-    k: 10
+    f: 50
+    k: 5
   cc_count:
     threshold_population: 5000
     below_or_equal: 1
