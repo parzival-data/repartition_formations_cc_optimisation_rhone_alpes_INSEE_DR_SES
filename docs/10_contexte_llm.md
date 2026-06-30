@@ -1,63 +1,63 @@
 # CONTEXTE LLM - cc-formation-optimizer
 
-Version du contexte : 2026-06-25  
-Public cible : modele LLM / agent de code autonome  
-Objectif : fournir une fenetre de contexte suffisamment complete pour reprendre
+Version du contexte : 2026-06-25
+Public cible : modèle LLM / agent de code autonome
+Objectif : fournir une fenêtre de contexte suffisamment complété pour reprendre
 le projet sans historique de conversation et sans lecture obligatoire du reste
-du depot.
+du dépôt.
 
-## 0. Regles d'utilisation pour un LLM
+## 0. Règles d'utilisation pour un LLM
 
-Ce fichier doit etre traite comme une specification de contexte, pas comme une
+Ce fichier doit être traité comme une spécification de contexte, pas comme une
 documentation utilisateur. Les informations ci-dessous sont alignees avec le
-depot au moment de la redaction.
+dépôt au moment de la rédaction.
 
 Priorites pour toute IA qui reprend le projet :
 
 1. Commencer par `git status --short`, `git log --oneline -15`, puis `pytest`.
-2. Ne pas modifier le modele mathematique sans demande explicite.
-3. Ne pas modifier les parametres metier YAML sans demande explicite.
-4. Ne pas relancer `solve` ou `solve-relaxed` sur les donnees reelles sans accord
-   explicite : la resolution peut etre longue.
+2. Ne pas modifier le modèle mathématique sans demande explicite.
+3. Ne pas modifier les paramètres métier YAML sans demande explicite.
+4. Ne pas relancer `solve` ou `solve-relaxed` sur les données réelles sans accord
+   explicite : la résolution peut être longue.
 5. Ne pas commit `donnee_brut_EAR27/`, `data/processed/`, `outputs/` ni les
-   fichiers ignores.
+   fichiers ignorés.
 6. Distinguer strictement :
    - optimisation principale ;
    - validation de solution ;
    - exports ;
    - carte ;
-   - surcouche metier post-optimisation.
+   - surcouche métier post-optimisation.
 7. Une proposition post-optimisation n'est jamais une modification automatique
    de la solution optimisee.
 
 ## 1. Identite du projet
 
-Nom Python : `cc-formation-optimizer`  
-Package : `src/cc_formation_optimizer/`  
-Commande console declaree dans `pyproject.toml` :
+Nom Python : `cc-formation-optimizer`
+Package : `src/cc_formation_optimizer/`
+Commande console déclarée dans `pyproject.toml` :
 
 ```text
 cc-formation-optimizer = cc_formation_optimizer.cli:main
 ```
 
-But metier : organiser des sessions de formation de coordonnateurs communaux
+But métier : organiser des sessions de formation de coordonnateurs communaux
 (CC) pour les communes PC/TPC de l'EAR 2027.
 
 Le projet a deux blocs fonctionnels :
 
 1. Optimisation sous contraintes :
-   - prepare ou charge les donnees ;
-   - construit un modele OR-Tools CP-SAT ;
-   - affecte les communes a des sessions ;
+   - prépare ou chargé les données ;
+   - construit un modèle OR-Tools CP-SAT ;
+   - affecte les communes à des sessions ;
    - choisit les sessions ouvertes et leurs pivots ;
    - valide puis exporte une solution.
-2. Surcouche metier post-optimisation :
+2. Surcouche métier post-optimisation :
    - relit les exports de la solution ;
-   - detecte des situations etonnantes metier ;
+   - détecte des situations étonnantes métier ;
    - produit des propositions argumentees ;
    - ne modifie jamais les exports d'optimisation.
 
-## 2. Etat Git et tests connus
+## 2. État Git et tests connus
 
 Derniers commits visibles :
 
@@ -72,16 +72,16 @@ ddc34a6 docs: add algorithmic model latex document
 9d33142 docs: align documentation with implemented pipeline
 ```
 
-Etat fonctionnel verifie recemment :
+État fonctionnel vérifie recemment :
 
 ```text
 pytest
 81 passed
 ```
 
-Attention : le nombre de tests peut changer. Toujours verifier localement.
+Attention : le nombre de tests peut changer. Toujours vérifier localement.
 
-## 3. Architecture du depot
+## 3. Architecture du dépôt
 
 ```text
 config/
@@ -136,7 +136,7 @@ src/cc_formation_optimizer/
   business_postprocess/
 ```
 
-Surcouche metier :
+Surcouche métier :
 
 ```text
 src/cc_formation_optimizer/business_postprocess/
@@ -175,7 +175,7 @@ tests/
   fixtures/
 ```
 
-## 4. Fichiers ignores et regles de commit
+## 4. Fichiers ignorés et règles de commit
 
 Le `.gitignore` ignore notamment :
 
@@ -201,15 +201,15 @@ outputs/**/*.yaml
 
 Exceptions : `.gitkeep` dans certains dossiers.
 
-Regle : ne pas ajouter les donnees brutes, les CSV prepares ni les exports a un
+Règle : ne pas ajouter les données brutes, les CSV préparés ni les exports à un
 commit, sauf demande explicite.
 
 ## 5. Configuration courante
 
-Fichier principal : `config/config_ear2027.yaml`  
-Schema documentaire : `config/schema.yaml`
+Fichier principal : `config/config_ear2027.yaml`
+Schéma documentaire : `config/schema.yaml`
 
-Inputs configures :
+Inputs configurés :
 
 ```text
 communes_path: data/processed/communes_clean.csv
@@ -235,7 +235,7 @@ travel_time_minutes: temps_minutes
 compatibility_allowed: compatible
 ```
 
-Parametres metier courants :
+Paramètres métier courants :
 
 ```text
 T = 75
@@ -263,7 +263,7 @@ random_seed = 1
 log_search_progress = true
 ```
 
-Assouplissements configures dans `relaxation` :
+Assouplissements configurés dans `relaxation` :
 
 ```text
 w_m_values: [250, 100, 50]
@@ -290,13 +290,13 @@ Contraintes de validation config :
 - `M_TPC = 1`
 - seuil population pour 2 CC = 5000
 - poids objectifs strictement positifs
-- cout `infinity` strictement positif
+- coût `infinity` strictement positif
 
-## 6. Donnees reelles locales
+## 6. Données réelles locales
 
 Dossier brut : `donnee_brut_EAR27/`
 
-Fichiers bruts detectes :
+Fichiers bruts détectes :
 
 ```text
 cities_geocoded.ods
@@ -308,20 +308,20 @@ matrice_temps_trajets_max_90min.ods
 villes_rhone_alpes.ods
 ```
 
-Fichier de coordonnees :
+Fichier de coordonnées :
 
 ```text
 donnee_brut_EAR27/cities_geocoded.ods
 ```
 
-Fichiers prepares presents localement :
+Fichiers préparés présents localement :
 
 ```text
 data/processed/communes_clean.csv
 data/processed/temps_trajet_clean.csv
 ```
 
-Chiffres connus depuis les outputs/preparation :
+Chiffres connus depuis les outputs/préparation :
 
 ```text
 communes = 543
@@ -332,8 +332,8 @@ trajets prepares/admissibles avec T=75 = 47 698
 coordonnees = 543/543
 ```
 
-Aucun fichier de compatibilite n'est actuellement charge. Le modele interprete
-les compatibilites absentes comme autorisees par defaut (`b_ij = 1`).
+Aucun fichier de compatibilité n'est actuellement chargé. Le modèle interprété
+les compatibilités absentes comme autorisées par défaut (`b_ij = 1`).
 
 ## 7. CLI disponible
 
@@ -409,7 +409,7 @@ YAML config
 -> map optional
 ```
 
-Pipeline avec preparation :
+Pipeline avec préparation :
 
 ```text
 raw ODS files
@@ -446,9 +446,9 @@ config compatibility_path optional
 
 `config.py`
 
-- charge YAML ;
+- chargé YAML ;
 - construit les dataclasses `OptimizerConfig`, `ModelParameters`, etc. ;
-- valide les invariants metier.
+- valide les invariants métier.
 
 `domain.py`
 
@@ -457,9 +457,9 @@ config compatibility_path optional
 `data_preparation.py`
 
 - lit les fichiers bruts ;
-- normalise communes, categories, populations, logements, coordonnees ;
-- prepare les temps de trajet ;
-- ecrit `communes_clean.csv`, `temps_trajet_clean.csv` et rapports.
+- normalisé communes, catégories, populations, logements, coordonnées ;
+- prépare les temps de trajet ;
+- écrit `communes_clean.csv`, `temps_trajet_clean.csv` et rapports.
 
 `data_loading.py`
 
@@ -468,21 +468,21 @@ config compatibility_path optional
 
 `parameters.py`
 
-- construit les ensembles et parametres derives ;
-- calcule `q_i`, `M_j`, `S`, `tau_ij`, `a_ij`, `b_ij`, `e_j_PC`, `e_j_TPC`.
+- construit les ensembles et paramètres dérivés ;
+- calculé `q_i`, `M_j`, `S`, `tau_ij`, `a_ij`, `b_ij`, `e_j_PC`, `e_j_TPC`.
 
 `diagnostics.py`
 
-- calcule volumes, slots, trajets admissibles, orphelins et alertes budget.
+- calculé volumes, slots, trajets admissibles, orphelins et alertes budget.
 
 `model_builder.py`
 
-- construit le modele CP-SAT ;
+- construit le modèle CP-SAT ;
 - cree les variables seulement pour les affectations admissibles et compatibles.
 
 `solver.py`
 
-- configure OR-Tools CP-SAT depuis `config.solver` ;
+- configuré OR-Tools CP-SAT depuis `config.solver` ;
 - retourne statut, objectif, solveur et temps.
 
 `solution_extractor.py`
@@ -492,29 +492,29 @@ config compatibility_path optional
 
 `validation.py`
 
-- controle affectation unique, ouverture, capacite, budgets, PC/TPC, trajets,
-  compatibilites, types de session, mixite et objectif recalcule.
+- contrôle affectation unique, ouverture, capacité, budgets, PC/TPC, trajets,
+  compatibilités, types de session, mixité et objectif recalculé.
 
 `export.py`
 
-- ecrit les exports uniquement si validation OK ;
+- écrit les exports uniquement si validation OK ;
 - produit CSV, JSON, Markdown, YAML et XLSX optionnel.
 
 `map_export.py`
 
-- produit ou regenere `solution_map.html`.
+- produit ou régénère `solution_map.html`.
 
 `relaxation.py`
 
 - orchestre `solve-relaxed` ;
-- ecrit journal et rapport d'assouplissement.
+- écrit journal et rapport d'assouplissement.
 
 `business_postprocess/`
 
-- surcouche metier post-optimisation ;
+- surcouche métier post-optimisation ;
 - ne modifie pas les exports d'origine.
 
-## 10. Modele mathematique implemente
+## 10. Modèle mathématique implémenté
 
 Ensembles :
 
@@ -529,13 +529,13 @@ S = {(j,m) | j in F, m in 1..M_j}
 Attention notation : `T` dans le YAML est le seuil de trajet. Dans le code,
 `DerivedParameters.T` est l'ensemble des communes TPC.
 
-Parametres :
+Paramètres :
 
 ```text
 q_i      nombre de CC de la commune i
 tau_ij   temps de trajet oriente i -> j
 a_ij     1 si trajet i -> j existe et tau_ij <= T
-b_ij     compatibilite metier, 1 par defaut
+b_ij     compatibilite metier, 1 par défaut
 T        seuil de trajet en minutes
 Q        capacite maximale en CC
 L        remplissage minimal
@@ -548,24 +548,24 @@ w_t,w_e,w_m poids objectif
 Variables :
 
 ```text
-x_ijm = 1 si commune i affectee a session (j,m)
+x_ijm = 1 si commune i affectée a session (j,m)
 y_jm  = 1 si session (j,m) ouverte
 z_jm  = 1 si session (j,m) de type TPC, 0 si PC
 d_jm  = mixite residuelle TPC dans session PC
 ```
 
-Contraintes implementees :
+Contraintes implémentées :
 
-- chaque commune est affectee exactement une fois ;
+- chaque commune est affectée exactement une fois ;
 - `x_ijm <= y_jm` ;
-- charge ouverte entre `L` et `Q` ;
+- chargé ouverte entre `L` et `Q` ;
 - `z_jm <= y_jm` ;
 - budgets PC/TPC ;
 - ordre des slots PC ;
 - interdiction PC dans session TPC ;
-- definition de la mixite `d_jm`.
+- définition de la mixité `d_jm`.
 
-Important : le code ne force pas le pivot a etre affecte a sa propre session.
+Important : le code ne force pas le pivot à être affecté à sa propre session.
 
 Important : le territoire EAR n'est pas une contrainte dure. Il apparait dans
 les exports et alertes.
@@ -576,10 +576,10 @@ Objectif :
 min w_t * O_trajet + w_e * O_eligibilite + w_m * O_mixite
 ```
 
-Pas de cout fixe d'ouverture de session dans l'objectif actuel. Pas de penalite
+Pas de coût fixe d'ouverture de session dans l'objectif actuel. Pas de pénalité
 territoriale dans l'objectif actuel.
 
-## 11. Resultats reels connus dans outputs/
+## 11. Résultats reels connus dans outputs/
 
 Depuis `outputs/reports/statistiques_solution.json` :
 
@@ -612,7 +612,7 @@ violations = []
 Warnings exportes :
 
 ```text
-commune affectee a un pivot d'un territoire different
+commune affectée a un pivot d'un territoire different
 forte mixite TPC dans session PC
 population tres dispersee
 session multi-territoires
@@ -621,16 +621,16 @@ temps de trajet proche de T
 temps_trajet_max proche de T
 ```
 
-Interpretation :
+Interprétation :
 
-- `FEASIBLE` = solution valide trouvee, optimalite non prouvee.
+- `FEASIBLE` = solution valide trouvée, optimalité non prouvée.
 - La validation est OK.
 - Les budgets sont satures : 55/55, 45/45, 10/10.
 - La solution est exploitable comme candidate, pas comme preuve d'optimum.
 
 ## 12. Exports d'optimisation
 
-Produits par `export.py` apres validation OK.
+Produits par `export.py` après validation OK.
 
 Solutions :
 
@@ -664,7 +664,7 @@ outputs/reports/rapport_assouplissements.md
 outputs/reports/config_finale.yaml
 ```
 
-Ces fichiers peuvent ne pas exister si `solve-relaxed` n'a pas ete execute.
+Ces fichiers peuvent ne pas exister si `solve-relaxed` n'a pas été exécuté.
 
 ## 13. Carte HTML
 
@@ -690,15 +690,15 @@ Caracteristiques :
 - SVG pour points et liens ;
 - fond WMTS `https://data.geopf.fr/wmts` ;
 - projection Web Mercator cote navigateur ;
-- donnees embarquees : `globalStats`, `validationChecks`, `points`, `summary`,
+- données embarquées : `globalStats`, `validationChecks`, `points`, `summary`,
   `missingCoordinates` ;
-- filtres territoire/type/categorie/alerte ;
+- filtrès territoire/type/catégorie/alerte ;
 - filtre pivots seulement ;
 - liens commune -> pivot optionnels ;
 - panneau debug carte ;
 - fallback sans fond de carte.
 
-## 14. Surcouche metier post-optimisation
+## 14. Surcouche métier post-optimisation
 
 Sous-package :
 
@@ -706,7 +706,7 @@ Sous-package :
 src/cc_formation_optimizer/business_postprocess/
 ```
 
-Point d'entree Python :
+Point d'entrée Python :
 
 ```text
 cc_formation_optimizer.business_postprocess.postprocess_business_rules
@@ -736,24 +736,24 @@ outputs/postprocess/business_reallocation_proposals.csv
 outputs/postprocess/business_reallocation_summary.csv
 ```
 
-Ces fichiers sont ignores par Git.
+Ces fichiers sont ignorés par Git.
 
 Modules internes :
 
 ```text
 types.py   dataclasses, constantes colonnes, noms de regles
 io.py      lecture exports + temps + compatibilites, ecriture CSV
-stats.py   statistiques avant/apres, contraintes detectables
+stats.py   statistiques avant/après, contraintes detectables
 rules.py   R1, R2, R3
 runner.py  orchestration, conflits, synthese
 ```
 
-Regles :
+Règles :
 
 R1 `Pivot interne pour formation TPC`
 
-- cible les sessions TPC dont le pivot actuel n'est pas affecte a la session ;
-- teste les communes affectees comme pivots internes candidats ;
+- cible les sessions TPC dont le pivot actuel n'est pas affecté à la session ;
+- teste les communes affectées comme pivots internes candidats ;
 - minimise le temps total, puis le temps max, puis population descendante, puis
   code commune ;
 - ne change aucune affectation ;
@@ -761,30 +761,30 @@ R1 `Pivot interne pour formation TPC`
 
 R2 `Rattacher une commune pivot a sa propre formation`
 
-- pour chaque session, verifie si la commune pivot est affectee a cette session ;
-- sinon verifie si elle est affectee a une autre session ou elle est aussi pivot ;
+- pour chaque session, vérifie si la commune pivot est affectée à cette session ;
+- sinon vérifie si elle est affectée à une autre session ou elle est aussi pivot ;
 - si aucune condition n'est vraie, propose de retirer la commune de sa session
-  actuelle et de l'ajouter a sa propre session ;
-- peut violer capacite, L, type PC/TPC ou trajet ;
-- la proposition est conservee avec `model_constraints_respected=false` si
-  necessaire.
+  actuelle et de l'ajouter à sa propre session ;
+- peut violer capacité, L, type PC/TPC ou trajet ;
+- la proposition est conservée avec `model_constraints_respected=false` si
+  nécessaire.
 
 R3 `Commune plus proche d'un autre pivot de meme type`
 
-- pour chaque commune affectee, compare les autres sessions du meme type PC/TPC ;
-- si un pivot de meme type est strictement plus proche et si le gain est au
+- pour chaque commune affectée, compare les autres sessions du même type PC/TPC ;
+- si un pivot de même type est strictement plus proche et si le gain est au
   moins `min_travel_time_gain_min`, produit une proposition de reassignment ;
-- ne compare pas les types differents ;
-- controle capacite, L, trajet, compatibilite et PC dans TPC.
+- ne compare pas les types différents ;
+- contrôle capacité, L, trajet, compatibilité et PC dans TPC.
 
 Conflits :
 
 - `conflict_hint` signale si une commune ou une session apparait dans plusieurs
   propositions ;
-- aucune resolution automatique des conflits ;
-- les propositions sont independantes.
+- aucune résolution automatique des conflits ;
+- les propositions sont indépendantes.
 
-Resultat actuel de la surcouche sur `outputs/` :
+Résultat actuel de la surcouche sur `outputs/` :
 
 ```text
 R1: 10 propositions, 10 compatibles, 0 non compatibles, gain total 751
@@ -800,7 +800,7 @@ Commande :
 pytest
 ```
 
-Etat verifie recemment :
+État vérifie recemment :
 
 ```text
 81 passed
@@ -817,16 +817,16 @@ Cas couverts :
 - session TPC avec pivot externe -> proposition R1 ;
 - session TPC avec pivot interne -> pas de proposition R1 ;
 - pivot absent de sa propre session -> proposition R2 ;
-- commune plus proche d'un pivot de meme type -> proposition R3 ;
-- pivot plus proche de type different -> pas de R3 ;
-- depassement capacite conserve mais marque non compatible ;
-- exports d'origine non modifies ;
-- CLI ecrit les deux fichiers dans `--output-dir` ;
+- commune plus proche d'un pivot de même type -> proposition R3 ;
+- pivot plus proche de type différent -> pas de R3 ;
+- dépassement capacité conservé mais marque non compatible ;
+- exports d'origine non modifiés ;
+- CLI écrit les deux fichiers dans `--output-dir` ;
 - import public via `business_postprocess`.
 
 ## 16. Documentation existante
 
-Documents a connaitre :
+Documents à connaître :
 
 ```text
 README.md
@@ -846,42 +846,42 @@ docs/10_contexte_llm.md
 docs/11_surcouche_metier_post_optimisation.md
 ```
 
-Role :
+Rôle :
 
-- `README.md` : document d'entree humain.
-- `docs/09_modelisation_algorithmique_complete.*` : explication complete du
-  modele et de l'algorithme.
+- `README.md` : document d'entrée humain.
+- `docs/09_modelisation_algorithmique_complete.*` : explication complété du
+  modèle et de l'algorithme.
 - `docs/11_surcouche_metier_post_optimisation.md` : doc humaine de la surcouche.
 - `docs/10_contexte_llm.md` : contexte technique pour IA.
 
-## 17. Points de vigilance metier
+## 17. Points de vigilance métier
 
-Le modele actuel autorise explicitement ou implicitement :
+Le modèle actuel autorisé explicitement ou implicitement :
 
-- un pivot qui ne participe pas a sa propre session ;
-- une session TPC portee par un pivot PC si ce pivot PC n'est pas affecte a la
+- un pivot qui ne participe pas à sa propre session ;
+- une session TPC portée par un pivot PC si ce pivot PC n'est pas affecté à la
   session ;
 - des TPC dans des sessions PC ;
 - des sessions multi-territoires ;
-- des couts tres eleves comme penalites, pas comme interdictions ;
-- un statut `FEASIBLE` sans preuve d'optimalite.
+- des coûts très élevés comme pénalités, pas comme interdictions ;
+- un statut `FEASIBLE` sans preuve d'optimalité.
 
-Le modele interdit :
+Le modèle interdit :
 
-- commune PC affectee a session TPC ;
+- commune PC affectée à session TPC ;
 - trajet absent ;
 - trajet superieur au seuil `T` ;
-- depassement des budgets ;
-- depassement de capacite dans la solution optimisee validee.
+- dépassement des budgets ;
+- dépassement de capacité dans la solution optimisee validée.
 
-Questions metier ouvertes :
+Questions métier ouvertes :
 
-- faut-il imposer que le pivot soit affecte a sa propre session ?
-- faut-il interdire ou penaliser les sessions multi-territoires ?
-- faut-il reduire la presence TPC dans sessions PC ?
-- faut-il penaliser plus fortement les longs trajets ?
-- faut-il reduire le nombre de sessions ouvertes ou seulement respecter `B` ?
-- faut-il integrer superviseurs, calendriers, disponibilites ?
+- faut-il imposer que le pivot soit affecté à sa propre session ?
+- faut-il interdire ou pénaliser les sessions multi-territoires ?
+- faut-il réduire la présence TPC dans sessions PC ?
+- faut-il pénaliser plus fortement les longs trajets ?
+- faut-il réduire le nombre de sessions ouvertes ou seulement respecter `B` ?
+- faut-il integrer superviseurs, calendriers, disponibilités ?
 
 ## 18. Points de vigilance techniques
 
@@ -889,13 +889,13 @@ Questions metier ouvertes :
 - `postprocess-business-rules` ne relance jamais le solveur.
 - Modifier `config/config_ear2027.yaml` ne modifie pas les exports existants.
 - Pour appliquer un YAML modifie, relancer `solve` ou `solve-relaxed`.
-- Pour appliquer de nouvelles donnees brutes, relancer `prepare-data`.
-- Verifier `outputs/reports/config_utilisee.yaml` pour connaitre la config qui a
+- Pour appliquer de nouvelles données brutes, relancer `prepare-data`.
+- Vérifier `outputs/reports/config_utilisee.yaml` pour connaître la config qui a
   produit des exports existants.
-- Le script console `cc-formation-optimizer` n'existe qu'apres installation du
+- Le script console `cc-formation-optimizer` n'existe qu'après installation du
   package (`python -m pip install -e ".[dev]"` ou equivalent).
 - En PowerShell, ne pas couper les commandes avec `\`.
-- Les outputs locaux peuvent etre presents mais ignores par Git.
+- Les outputs locaux peuvent être présents mais ignorés par Git.
 
 ## 19. Procedures standard pour une IA
 
@@ -907,14 +907,14 @@ git log --oneline -15
 pytest
 ```
 
-Verifier configuration :
+Vérifier configuration :
 
 ```powershell
 cc-formation-optimizer validate-config --config config/config_ear2027.yaml
 cc-formation-optimizer show-config --config config/config_ear2027.yaml
 ```
 
-Verifier donnees sans solve long :
+Vérifier données sans solve long :
 
 ```powershell
 cc-formation-optimizer diagnose --config config/config_ear2027.yaml
@@ -937,26 +937,26 @@ cc-formation-optimizer solve-relaxed --config config/config_ear2027.yaml --expor
 
 Pour une modification de code :
 
-1. changements limites au perimetre ;
+1. changements limites au perimêtre ;
 2. tests existants et nouveaux tests pertinents ;
 3. `pytest` OK ;
-4. documentation mise a jour si comportement visible ;
+4. documentation mise à jour si comportement visible ;
 5. `git status --short` inspecte ;
-6. commit cible si demande.
+6. commit cible si demandé.
 
-Pour une modification de modele :
+Pour une modification de modèle :
 
 1. lire `model_builder.py`, `validation.py`, `parameters.py` ;
 2. modifier la formulation ;
-3. modifier la validation independante ;
-4. modifier les docs mathematiques ;
+3. modifier la validation indépendante ;
+4. modifier les docs mathématiques ;
 5. ajouter tests unitaires et petit end-to-end ;
-6. expliciter l'impact metier.
+6. expliciter l'impact métier.
 
-Pour une modification de surcouche metier :
+Pour une modification de surcouche métier :
 
 1. ne pas toucher au solveur ;
 2. ne pas modifier les exports d'origine ;
 3. ajouter/adapter tests dans `tests/test_postprocess.py` ;
-4. mettre a jour `docs/11_surcouche_metier_post_optimisation.md` si visible ;
-5. mettre a jour ce fichier si la logique change.
+4. mettre à jour `docs/11_surcouche_metier_post_optimisation.md` si visible ;
+5. mettre à jour ce fichier si la logique change.

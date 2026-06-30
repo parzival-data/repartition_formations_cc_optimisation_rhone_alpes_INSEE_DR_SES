@@ -23,7 +23,7 @@ Le dossier `--input-dir` doit contenir les exports habituels :
 - `solutions/sessions.csv` ;
 - `solutions/communes_affectees.csv`.
 
-La commande recharge aussi les temps de trajet configurés dans le YAML afin de
+La commande rechargé aussi les temps de trajet configurés dans le YAML afin de
 comparer les pivots possibles. Le seuil minimal de gain pour les rattachements à
 un autre pivot de même type est configurable :
 
@@ -70,7 +70,7 @@ Deux fichiers CSV sont écrits dans le dossier de sortie :
 
 Les propositions contiennent notamment la règle appliquée, la session actuelle,
 la commune concernée, le pivot proposé, les temps de trajet avant/après, les
-charges en CC avant/après, les gains potentiels, un indicateur de compatibilité
+chargés en CC avant/après, les gains potentiels, un indicateur de compatibilité
 avec les contraintes du modèle et un commentaire métier.
 
 La colonne `model_constraints_respected` indique si la proposition semble rester
@@ -109,7 +109,7 @@ métier explicite.
 Pour chaque commune affectée, la surcouche compare le pivot actuel avec les
 autres pivots ouverts du même type de session, PC ou TPC. Si une autre session de
 même type présente un temps de trajet strictement plus faible, et si le gain est
-au moins égal au seuil configuré, une proposition de rattachement est produite.
+au moins égal àu seuil configuré, une proposition de rattachement est produite.
 
 Cette règle ne compare pas les sessions de types différents. Une commune plus
 proche d'un pivot TPC ne générera donc pas de proposition si elle est actuellement
