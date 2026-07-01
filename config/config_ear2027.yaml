@@ -73,7 +73,7 @@ data_preparation:
     default_when_absent: 1
 
 parameters:
-  T: 75
+  T: 60
   Q: 14
   L: 6
   formation_budgets:
@@ -88,9 +88,9 @@ parameters:
     M_PC: 3
     M_TPC: 1
   objective_weights:
-    w_t: 1
+    w_t: 100
     w_e: 1000
-    w_m: 500
+    w_m: 20
   eligibility_costs:
     infinity: 1000000000
     population_bands:
@@ -112,7 +112,7 @@ parameters:
         e_TPC: 500
 
 solver:
-  time_limit_seconds: 2400
+  time_limit_seconds: 1200
   num_workers: 8
   random_seed: 1
   log_search_progress: true
