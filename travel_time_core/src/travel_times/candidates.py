@@ -1,3 +1,5 @@
+"""Generation des couples commune-pivot candidats."""
+
 from __future__ import annotations
 
 from travel_times.distance import haversine_km
@@ -5,6 +7,25 @@ from travel_times.models import COMMUNE_PC, COMMUNE_TPC, CandidateRoute, CityRec
 
 
 def candidate_count_for_type(commune_type: str, *, k_default: int, k_pc: int, k_tpc: int) -> int:
+    """Retourne le nombre de candidats selon le type de commune.
+
+    Parameters
+    ----------
+    commune_type : str
+        Type de la commune origine.
+    k_default : int
+        Nombre de candidats par defaut.
+    k_pc : int
+        Nombre de candidats pour une commune PC.
+    k_tpc : int
+        Nombre de candidats pour une commune TPC.
+
+    Returns
+    -------
+    int
+        Nombre de pivots candidats a conserver.
+    """
+
     if commune_type == COMMUNE_PC:
         return k_pc
     if commune_type == COMMUNE_TPC:
@@ -19,6 +40,25 @@ def build_candidate_routes(
     k_pc: int = 120,
     k_tpc: int = 100,
 ) -> list[CandidateRoute]:
+    """Construit les couples commune-pivot les plus proches a vol d'oiseau.
+
+    Parameters
+    ----------
+    cities : list[CityRecord]
+        Communes avec coordonnees disponibles.
+    k_default : int, default=150
+        Nombre de candidats pour une commune standard.
+    k_pc : int, default=120
+        Nombre de candidats pour une commune PC.
+    k_tpc : int, default=100
+        Nombre de candidats pour une commune TPC.
+
+    Returns
+    -------
+    list[CandidateRoute]
+        Couples orientes classes par commune origine et distance.
+    """
+
     geocoded = [city for city in cities if city.lat is not None and city.lon is not None]
     routes: list[CandidateRoute] = []
     max_possible = max(len(geocoded) - 1, 0)

@@ -1,3 +1,5 @@
+"""Lecture et ecriture ODS pour les communes et exports de trajets."""
+
 from __future__ import annotations
 
 import logging
@@ -28,6 +30,19 @@ TYPE_COLUMNS = {"precision", "type", "type_commune", "categorie", "taille_commun
 
 
 class InputValidationError(ValueError):
+    """Erreur de validation d'un fichier d'entree.
+
+    Parameters
+    ----------
+    errors : list[str]
+        Messages d'erreur collectes pendant la validation.
+
+    Attributes
+    ----------
+    errors : list[str]
+        Messages d'erreur detailles.
+    """
+
     def __init__(self, errors: list[str]) -> None:
         super().__init__("\n".join(errors))
         self.errors = errors
@@ -42,6 +57,24 @@ def _normalize_header(value: Any) -> str:
 
 
 def detect_columns(df: pd.DataFrame) -> ColumnMapping:
+    """Detecte les colonnes nom, code commune et type dans un tableau.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Donnees lues depuis l'ODS.
+
+    Returns
+    -------
+    ColumnMapping
+        Colonnes detectees.
+
+    Raises
+    ------
+    InputValidationError
+        Si les colonnes obligatoires nom ou code commune sont introuvables.
+    """
+
     normalized = {_normalize_header(column): column for column in df.columns}
     name = next((normalized[key] for key in NAME_COLUMNS if key in normalized), None)
     insee = next((normalized[key] for key in INSEE_COLUMNS if key in normalized), None)
@@ -63,6 +96,19 @@ def detect_columns(df: pd.DataFrame) -> ColumnMapping:
 
 
 def normalize_insee(value: Any) -> str:
+    """Normalise un code commune lu depuis un tableur.
+
+    Parameters
+    ----------
+    value : Any
+        Valeur brute du code commune.
+
+    Returns
+    -------
+    str
+        Code nettoye, ou chaine vide si absent.
+    """
+
     if value is None or pd.isna(value):
         return ""
     text = str(value).strip()
@@ -73,6 +119,19 @@ def normalize_insee(value: Any) -> str:
 
 
 def normalize_commune_type(value: Any) -> str:
+    """Normalise le type de commune.
+
+    Parameters
+    ----------
+    value : Any
+        Valeur brute de type.
+
+    Returns
+    -------
+    str
+        ``PC``, ``TPC`` ou ``STANDARD``.
+    """
+
     if value is None or pd.isna(value):
         return COMMUNE_STANDARD
     text = str(value).strip().upper()
@@ -85,6 +144,26 @@ def normalize_commune_type(value: Any) -> str:
 
 
 def read_cities_ods(path: Path, sheet_name: str | int | None = None) -> list[CityInput]:
+    """Lit les communes d'un fichier ODS.
+
+    Parameters
+    ----------
+    path : Path
+        Chemin du fichier ODS.
+    sheet_name : str | int | None, default=None
+        Feuille a lire, ou premiere feuille par defaut.
+
+    Returns
+    -------
+    list[CityInput]
+        Communes valides.
+
+    Raises
+    ------
+    InputValidationError
+        Si le fichier est absent ou si les lignes contiennent des erreurs.
+    """
+
     if not path.exists():
         raise InputValidationError([f"Fichier introuvable: {path}"])
     selected_sheet = 0 if sheet_name is None else sheet_name
@@ -122,6 +201,16 @@ def read_cities_ods(path: Path, sheet_name: str | int | None = None) -> list[Cit
 
 
 def write_ods(path: Path, sheets: dict[str, pd.DataFrame]) -> None:
+    """Ecrit un classeur ODS a partir de DataFrames.
+
+    Parameters
+    ----------
+    path : Path
+        Chemin du fichier ODS a ecrire.
+    sheets : dict[str, pd.DataFrame]
+        Feuilles a produire, indexees par nom.
+    """
+
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = path.with_name(f"{path.name}.tmp")
     if tmp_path.exists():

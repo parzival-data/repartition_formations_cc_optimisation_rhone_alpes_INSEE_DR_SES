@@ -12,7 +12,19 @@ from cc_formation_optimizer.model_builder import ModelBundle
 
 @dataclass(frozen=True)
 class SolveResult:
-    """Resultat minimal d'une resolution CP-SAT."""
+    """Resultat minimal d'une resolution CP-SAT.
+
+    Attributes
+    ----------
+    status : str
+        Statut OR-Tools converti en chaine.
+    objective_value : float | None
+        Valeur d'objectif retournee par le solveur si une solution existe.
+    solver : cp_model.CpSolver
+        Instance de solveur conservee pour lire les variables.
+    wall_time_seconds : float
+        Temps de resolution mesure par CP-SAT.
+    """
 
     status: str
     objective_value: float | None
@@ -21,7 +33,20 @@ class SolveResult:
 
 
 def solve_model(model_bundle: ModelBundle, config: OptimizerConfig) -> SolveResult:
-    """Resout un modele CP-SAT avec les parametres solveur du YAML."""
+    """Resout un modele CP-SAT avec les parametres du YAML.
+
+    Parameters
+    ----------
+    model_bundle : ModelBundle
+        Modele CP-SAT construit par :func:`build_model`.
+    config : OptimizerConfig
+        Configuration contenant les options de solveur.
+
+    Returns
+    -------
+    SolveResult
+        Statut, objectif eventuel, solveur et temps de resolution.
+    """
 
     solver = cp_model.CpSolver()
     solver_config = config.solver

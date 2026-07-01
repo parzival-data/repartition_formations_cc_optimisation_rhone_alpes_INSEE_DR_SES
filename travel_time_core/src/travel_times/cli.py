@@ -1,3 +1,5 @@
+"""Interface Typer du sous-projet de calcul des temps de trajet."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -63,6 +65,16 @@ def main(
     ] = Path("config/config_travel_times.yaml"),
     verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False,
 ) -> None:
+    """Configure la CLI avant l'execution d'une commande.
+
+    Parameters
+    ----------
+    config : Path, default=Path("config/config_travel_times.yaml")
+        Chemin du YAML de configuration.
+    verbose : bool, default=False
+        Active les logs detailles.
+    """
+
     global _CONFIG_PATH
     _CONFIG_PATH = config
     configure_logging(verbose)
@@ -70,6 +82,8 @@ def main(
 
 @app.command("init")
 def init_command() -> None:
+    """Initialise la configuration, les dossiers et le cache local."""
+
     write_default_settings(_CONFIG_PATH)
     settings = _settings()
     init_project(settings)
@@ -80,6 +94,8 @@ def init_command() -> None:
 
 @app.command("validate-config")
 def validate_config_command() -> None:
+    """Valide la configuration `travel_time_core` courante."""
+
     try:
         validate_settings(_settings())
     except ValueError as exc:
@@ -90,6 +106,8 @@ def validate_config_command() -> None:
 
 @app.command("import-communes")
 def import_communes_command() -> None:
+    """Importe les communes depuis le fichier configure."""
+
     settings = _settings()
     validate_settings(settings)
     with db.connect(settings.database.sqlite_path) as conn:
@@ -105,6 +123,14 @@ def validate_input_command(
         typer.Option("--input", exists=True, file_okay=True, dir_okay=False),
     ],
 ) -> None:
+    """Valide un fichier ODS de communes.
+
+    Parameters
+    ----------
+    input_path : Path
+        Chemin du fichier ODS a controler.
+    """
+
     settings = _settings()
     try:
         count = validate_input(input_path, sheet_name=settings.input.sheet_name)
@@ -123,6 +149,14 @@ def import_cities_command(
         typer.Option("--input", exists=True, file_okay=True, dir_okay=False),
     ],
 ) -> None:
+    """Importe des communes depuis un fichier ODS.
+
+    Parameters
+    ----------
+    input_path : Path
+        Chemin du fichier ODS a importer.
+    """
+
     settings = _settings()
     with db.connect(settings.database.sqlite_path) as conn:
         db.init_db(conn)
@@ -135,6 +169,16 @@ def geocode_command(
     refresh: Annotated[bool, typer.Option("--refresh")] = False,
     only_missing: Annotated[bool, typer.Option("--only-missing")] = False,
 ) -> None:
+    """Geocode les communes presentes dans le cache.
+
+    Parameters
+    ----------
+    refresh : bool, default=False
+        Recalcule toutes les communes.
+    only_missing : bool, default=False
+        Ne traite que les communes sans coordonnees.
+    """
+
     settings = _settings()
     with db.connect(settings.database.sqlite_path) as conn:
         db.init_db(conn)
@@ -153,6 +197,18 @@ def build_candidates_command(
     k_pc: Annotated[int | None, typer.Option("--k-pc")] = None,
     k_tpc: Annotated[int | None, typer.Option("--k-tpc")] = None,
 ) -> None:
+    """Construit les couples commune-pivot candidats.
+
+    Parameters
+    ----------
+    k_default : int | None, default=None
+        Nombre de candidats pour une commune standard.
+    k_pc : int | None, default=None
+        Nombre de candidats pour une commune PC.
+    k_tpc : int | None, default=None
+        Nombre de candidats pour une commune TPC.
+    """
+
     settings = _settings()
     with db.connect(settings.database.sqlite_path) as conn:
         db.init_db(conn)
@@ -173,6 +229,22 @@ def compute_batch_command(
     rate_limit: Annotated[float | None, typer.Option("--rate-limit")] = None,
     dry_run: Annotated[bool, typer.Option("--dry-run")] = False,
 ) -> None:
+    """Calcule un lot de trajets via le client IGN.
+
+    Parameters
+    ----------
+    only_missing : bool, default=False
+        Ignore les trajets deja presents.
+    refresh : bool, default=False
+        Force le recalcul.
+    limit : int | None, default=None
+        Limite le nombre de couples traites.
+    rate_limit : float | None, default=None
+        Remplace temporairement la cadence IGN.
+    dry_run : bool, default=False
+        Compte les trajets sans les calculer.
+    """
+
     settings = _settings()
     if rate_limit is not None:
         settings.ign.rate_limit_per_sec = rate_limit
@@ -198,6 +270,16 @@ def compute_command(
     refresh: Annotated[bool, typer.Option("--refresh")] = False,
     dry_run: Annotated[bool, typer.Option("--dry-run")] = False,
 ) -> None:
+    """Calcule les trajets selon la configuration runtime.
+
+    Parameters
+    ----------
+    refresh : bool, default=False
+        Force le recalcul.
+    dry_run : bool, default=False
+        Compte les trajets sans les calculer.
+    """
+
     settings = _settings()
     validate_settings(settings)
     with db.connect(settings.database.sqlite_path) as conn:
@@ -221,6 +303,22 @@ def route_command(
     to_name: Annotated[str | None, typer.Option("--to-name")] = None,
     refresh: Annotated[bool, typer.Option("--refresh")] = False,
 ) -> None:
+    """Calcule un trajet specifique entre deux communes.
+
+    Parameters
+    ----------
+    from_insee : str | None, default=None
+        Code commune origine.
+    to_insee : str | None, default=None
+        Code commune destination.
+    from_name : str | None, default=None
+        Nom de commune origine.
+    to_name : str | None, default=None
+        Nom de commune destination.
+    refresh : bool, default=False
+        Force le recalcul du trajet.
+    """
+
     if not ((from_insee or from_name) and (to_insee or to_name)):
         typer.echo("Indiquez une origine et une destination par INSEE ou par nom.", err=True)
         raise typer.Exit(1)
@@ -255,6 +353,8 @@ def route_command(
 
 @app.command("export")
 def export_command() -> None:
+    """Ecrit les exports complets depuis le cache SQLite."""
+
     settings = _settings()
     with db.connect(settings.database.sqlite_path) as conn:
         db.init_db(conn)
@@ -274,6 +374,14 @@ def export_thresholds_command(
         ),
     ] = "60,90,120",
 ) -> None:
+    """Ecrit les exports filtres par seuils de duree.
+
+    Parameters
+    ----------
+    thresholds : str, default="60,90,120"
+        Seuils en minutes separes par des virgules.
+    """
+
     parsed_thresholds = _parse_thresholds(thresholds)
     settings = _settings()
     with db.connect(settings.database.sqlite_path) as conn:
@@ -286,6 +394,8 @@ def export_thresholds_command(
 
 @app.command("export-matrices")
 def export_matrices_command() -> None:
+    """Ecrit les exports configures, dont le CSV compatible optimiseur."""
+
     settings = _settings()
     validate_settings(settings)
     with db.connect(settings.database.sqlite_path) as conn:
@@ -304,6 +414,16 @@ def run_all_command(
     ],
     dry_run: Annotated[bool, typer.Option("--dry-run")] = False,
 ) -> None:
+    """Execute l'ancien pipeline complet depuis un ODS.
+
+    Parameters
+    ----------
+    input_path : Path
+        Fichier ODS d'entree.
+    dry_run : bool, default=False
+        Execute sans ecrire les exports finaux.
+    """
+
     run_all(_settings(), input_path, dry_run=dry_run)
     typer.echo("Pipeline termine.")
 
@@ -312,6 +432,14 @@ def run_all_command(
 def run_pipeline_command(
     dry_run: Annotated[bool, typer.Option("--dry-run")] = False,
 ) -> None:
+    """Execute le pipeline configure de bout en bout.
+
+    Parameters
+    ----------
+    dry_run : bool, default=False
+        Execute sans ecrire les exports finaux.
+    """
+
     paths = run_configured_pipeline(_settings(), dry_run=dry_run)
     typer.echo("Pipeline termine.")
     for path in paths.values():

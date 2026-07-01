@@ -11,7 +11,31 @@ from cc_formation_optimizer.parameters import DerivedParameters
 
 @dataclass(frozen=True)
 class PreSolveDiagnostic:
-    """Synthese du diagnostic structurel avant resolution."""
+    """Synthese du diagnostic structurel avant resolution.
+
+    Attributes
+    ----------
+    total_communes : int
+        Nombre de communes a affecter.
+    pc_count : int
+        Nombre de communes PC.
+    tpc_count : int
+        Nombre de communes TPC.
+    total_cc : int
+        Nombre total de CC a former.
+    min_required_formations : int
+        Borne inferieure theorique sur le nombre de sessions.
+    slot_count : int
+        Nombre de slots disponibles.
+    admissible_travel_count : int
+        Nombre de couples commune-pivot avec trajet admissible.
+    orphan_communes : tuple[str, ...]
+        Communes sans aucun pivot atteignable et compatible.
+    pc_without_pc_pivot : tuple[str, ...]
+        Communes PC sans pivot eligible pour une session PC.
+    budget_warning : str | None
+        Alerte de budget si la borne minimale depasse ``B``.
+    """
 
     total_communes: int
     pc_count: int
@@ -26,7 +50,20 @@ class PreSolveDiagnostic:
 
 
 def run_pre_solve_diagnostics(derived: DerivedParameters, config: OptimizerConfig) -> PreSolveDiagnostic:
-    """Execute les diagnostics structurels avant resolution."""
+    """Execute les diagnostics structurels avant resolution.
+
+    Parameters
+    ----------
+    derived : DerivedParameters
+        Parametres derives avant construction ou resolution du modele.
+    config : OptimizerConfig
+        Configuration contenant les capacites et budgets.
+
+    Returns
+    -------
+    PreSolveDiagnostic
+        Synthese des volumes, trajets admissibles et blocages potentiels.
+    """
 
     total_cc = sum(derived.q_i.values())
     min_required_formations = ceil(total_cc / config.parameters.Q)

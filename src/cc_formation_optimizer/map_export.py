@@ -20,12 +20,26 @@ from cc_formation_optimizer.validation import ValidationReport
 
 
 class MapExportError(ValueError):
-    """Erreur empechant l'export cartographique."""
+    """Erreur empechant l'export cartographique.
+
+    Cette exception signale une solution non validee ou des exports existants
+    manquants/invalides lors de la regeneration de la carte.
+    """
 
 
 @dataclass(frozen=True)
 class MapExportResult:
-    """Chemin du fichier HTML cartographique produit."""
+    """Resultat de production de la carte HTML.
+
+    Attributes
+    ----------
+    html_path : Path
+        Chemin du fichier HTML cartographique produit.
+    mapped_points : int
+        Nombre de communes dessinees sur la carte.
+    missing_coordinates : int
+        Nombre de communes absentes de la carte faute de coordonnees.
+    """
 
     html_path: Path
     mapped_points: int
@@ -40,7 +54,37 @@ def export_solution_map(
     communes: list[Commune],
     output_dir: str | Path | None = None,
 ) -> MapExportResult:
-    """Genere `outputs/maps/solution_map.html` depuis une solution validee."""
+    """Genere la carte HTML depuis une solution validee.
+
+    La fonction ecrit ``solution_map.html`` dans le dossier ``maps`` sous la
+    racine d'export. Les communes sans coordonnees restent listees dans la
+    carte mais ne sont pas dessinees.
+
+    Parameters
+    ----------
+    solution : ExtractedSolution
+        Solution extraite a cartographier.
+    validation_report : ValidationReport
+        Rapport de validation associe.
+    model_bundle : ModelBundle
+        Modele utilise pour reconstruire les lignes d'export.
+    config : OptimizerConfig
+        Configuration contenant le dossier d'export et les seuils d'alerte.
+    communes : list[Commune]
+        Communes avec coordonnees eventuelles.
+    output_dir : str | Path | None, default=None
+        Racine de sortie optionnelle.
+
+    Returns
+    -------
+    MapExportResult
+        Chemin HTML et compteurs de points cartographies.
+
+    Raises
+    ------
+    MapExportError
+        Si la solution n'a pas passe la validation.
+    """
 
     if not validation_report.is_valid:
         raise MapExportError("La solution n'a pas passe la validation; la carte ne sera pas produite.")
@@ -74,7 +118,33 @@ def render_map_from_exports(
     stats_path: str | Path | None = None,
     output_path: str | Path | None = None,
 ) -> MapExportResult:
-    """Regenere la carte HTML depuis des exports existants, sans resoudre."""
+    """Regenere la carte HTML depuis des exports existants, sans resoudre.
+
+    Parameters
+    ----------
+    config : OptimizerConfig
+        Configuration utilisee pour recharger les communes et seuils d'alerte.
+    solution_dir : str | Path | None, default=None
+        Racine contenant ``solutions/`` et ``reports/``.
+    sessions_path : str | Path | None, default=None
+        Chemin optionnel du CSV des sessions.
+    assignments_path : str | Path | None, default=None
+        Chemin optionnel du CSV des communes affectees.
+    stats_path : str | Path | None, default=None
+        Chemin optionnel du JSON de statistiques.
+    output_path : str | Path | None, default=None
+        Chemin HTML de sortie.
+
+    Returns
+    -------
+    MapExportResult
+        Chemin HTML et compteurs de points cartographies.
+
+    Raises
+    ------
+    MapExportError
+        Si un export requis est absent ou invalide.
+    """
 
     root = Path(solution_dir) if solution_dir is not None else Path(config.exports.get("output_dir", "outputs"))
     sessions_csv = Path(sessions_path) if sessions_path is not None else root / "solutions" / "sessions.csv"

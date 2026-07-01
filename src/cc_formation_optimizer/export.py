@@ -20,12 +20,32 @@ from cc_formation_optimizer.validation import ValidationReport
 
 
 class ExportError(ValueError):
-    """Erreur empechant la production d'exports exploitables."""
+    """Erreur empechant la production d'exports exploitables.
+
+    Cette exception est levee lorsqu'une solution non validee est transmise a
+    l'export final.
+    """
 
 
 @dataclass(frozen=True)
 class ExportResult:
-    """Chemins des fichiers d'export produits."""
+    """Chemins des fichiers d'export produits.
+
+    Attributes
+    ----------
+    sessions_csv : Path
+        CSV des sessions ouvertes.
+    assignments_csv : Path
+        CSV des communes affectees.
+    report_markdown : Path
+        Rapport Markdown de solution.
+    statistics_json : Path
+        Statistiques JSON de la solution.
+    used_config_yaml : Path
+        Copie du YAML utilise pour produire la solution.
+    xlsx : Path | None
+        Classeur XLSX optionnel si la dependance est disponible.
+    """
 
     sessions_csv: Path
     assignments_csv: Path
@@ -99,7 +119,40 @@ def export_solution(
     communes: list[Commune],
     output_dir: str | Path | None = None,
 ) -> ExportResult:
-    """Produit les exports finaux uniquement pour une solution valide."""
+    """Produit les exports finaux uniquement pour une solution validee.
+
+    La fonction ecrit les CSV, statistiques JSON, rapport Markdown, copie de
+    configuration et, si possible, un classeur XLSX. Elle ne doit pas etre
+    appelee avant :func:`validate_solution`.
+
+    Parameters
+    ----------
+    solution : ExtractedSolution
+        Solution extraite a exporter.
+    validation_report : ValidationReport
+        Rapport de validation associe a la solution.
+    model_bundle : ModelBundle
+        Modele et parametres derives utilises pour recalculer les indicateurs.
+    config : OptimizerConfig
+        Configuration contenant les seuils d'alertes et chemins par defaut.
+    config_path : str | Path
+        Chemin de la configuration initiale a copier dans les rapports.
+    communes : list[Commune]
+        Communes chargees, utilisees pour enrichir les exports.
+    output_dir : str | Path | None, default=None
+        Racine des exports. Si absent, ``config.exports["output_dir"]`` est
+        utilise.
+
+    Returns
+    -------
+    ExportResult
+        Chemins des fichiers produits.
+
+    Raises
+    ------
+    ExportError
+        Si le rapport de validation n'est pas valide.
+    """
 
     if not validation_report.is_valid:
         raise ExportError("La solution n'a pas passe la validation; aucun export exploitable ne sera produit.")
@@ -150,7 +203,22 @@ def build_session_export_rows(
     model_bundle: ModelBundle,
     config: OptimizerConfig,
 ) -> list[dict[str, Any]]:
-    """Construit les lignes detaillees de sessions ouvertes."""
+    """Construit les lignes detaillees de sessions ouvertes.
+
+    Parameters
+    ----------
+    solution : ExtractedSolution
+        Solution extraite et supposee validee.
+    model_bundle : ModelBundle
+        Modele contenant les couts d'eligibilite des pivots.
+    config : OptimizerConfig
+        Configuration contenant les seuils d'alerte.
+
+    Returns
+    -------
+    list[dict[str, Any]]
+        Lignes pretes pour le CSV des sessions.
+    """
 
     assignments_by_session = _assignments_by_session(solution.assignments)
     rows: list[dict[str, Any]] = []
@@ -212,7 +280,22 @@ def build_assignment_export_rows(
     commune_by_id: dict[str, Commune],
     config: OptimizerConfig,
 ) -> list[dict[str, Any]]:
-    """Construit les lignes detaillees de communes affectees."""
+    """Construit les lignes detaillees de communes affectees.
+
+    Parameters
+    ----------
+    solution : ExtractedSolution
+        Solution extraite et supposee validee.
+    commune_by_id : dict[str, Commune]
+        Index des communes par code.
+    config : OptimizerConfig
+        Configuration contenant les seuils d'alerte.
+
+    Returns
+    -------
+    list[dict[str, Any]]
+        Lignes pretes pour le CSV des communes affectees.
+    """
 
     rows: list[dict[str, Any]] = []
     for assignment in solution.assignments:
@@ -249,7 +332,26 @@ def build_statistics(
     session_rows: list[dict[str, Any]],
     assignment_rows: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    """Construit les statistiques JSON de la solution."""
+    """Construit les statistiques JSON de la solution.
+
+    Parameters
+    ----------
+    solution : ExtractedSolution
+        Solution extraite et supposee validee.
+    validation_report : ValidationReport
+        Rapport de validation de la solution.
+    config : OptimizerConfig
+        Configuration contenant les capacites et budgets.
+    session_rows : list[dict[str, Any]]
+        Lignes d'export des sessions.
+    assignment_rows : list[dict[str, Any]]
+        Lignes d'export des communes affectees.
+
+    Returns
+    -------
+    dict[str, Any]
+        Statistiques synthetiques destinees au JSON et au rapport.
+    """
 
     travel_times = [row["temps_trajet_minutes"] for row in assignment_rows]
     warnings = sorted(

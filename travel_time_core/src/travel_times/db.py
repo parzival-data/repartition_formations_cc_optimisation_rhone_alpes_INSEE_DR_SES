@@ -1,3 +1,5 @@
+"""Acces SQLite pour le cache des communes, candidats et trajets."""
+
 from __future__ import annotations
 
 import sqlite3
@@ -16,10 +18,31 @@ from travel_times.models import (
 
 
 def utc_now() -> str:
+    """Retourne l'horodatage UTC courant.
+
+    Returns
+    -------
+    str
+        Date ISO en secondes.
+    """
+
     return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 def connect(db_path: Path) -> sqlite3.Connection:
+    """Ouvre une connexion SQLite configuree pour le cache local.
+
+    Parameters
+    ----------
+    db_path : Path
+        Chemin de la base SQLite.
+
+    Returns
+    -------
+    sqlite3.Connection
+        Connexion avec lignes accessibles par nom de colonne.
+    """
+
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
@@ -28,6 +51,14 @@ def connect(db_path: Path) -> sqlite3.Connection:
 
 
 def init_db(conn: sqlite3.Connection) -> None:
+    """Cree les tables et index du cache si necessaire.
+
+    Parameters
+    ----------
+    conn : sqlite3.Connection
+        Connexion SQLite ouverte.
+    """
+
     conn.executescript(
         """
         CREATE TABLE IF NOT EXISTS cities (
@@ -80,6 +111,21 @@ def init_db(conn: sqlite3.Connection) -> None:
 
 
 def upsert_cities(conn: sqlite3.Connection, cities: Iterable[CityInput]) -> int:
+    """Insere ou met a jour les communes minimales.
+
+    Parameters
+    ----------
+    conn : sqlite3.Connection
+        Connexion SQLite ouverte.
+    cities : Iterable[CityInput]
+        Communes a persister.
+
+    Returns
+    -------
+    int
+        Nombre de communes traitees.
+    """
+
     now = utc_now()
     count = 0
     for city in cities:
@@ -102,6 +148,21 @@ def upsert_cities(conn: sqlite3.Connection, cities: Iterable[CityInput]) -> int:
 
 
 def upsert_city_records(conn: sqlite3.Connection, cities: Iterable[CityRecord]) -> int:
+    """Insere ou met a jour des communes enrichies.
+
+    Parameters
+    ----------
+    conn : sqlite3.Connection
+        Connexion SQLite ouverte.
+    cities : Iterable[CityRecord]
+        Communes enrichies a persister.
+
+    Returns
+    -------
+    int
+        Nombre de communes traitees.
+    """
+
     now = utc_now()
     count = 0
     for city in cities:
@@ -148,6 +209,16 @@ def upsert_city_records(conn: sqlite3.Connection, cities: Iterable[CityRecord]) 
 
 
 def update_city_geocode(conn: sqlite3.Connection, result: GeocodeResult) -> None:
+    """Met a jour les coordonnees et le statut de geocodage d'une commune.
+
+    Parameters
+    ----------
+    conn : sqlite3.Connection
+        Connexion SQLite ouverte.
+    result : GeocodeResult
+        Resultat de geocodage a appliquer.
+    """
+
     conn.execute(
         """
         UPDATE cities
@@ -176,6 +247,23 @@ def upsert_candidate_routes(
     routes: Iterable[CandidateRoute],
     clear: bool = True,
 ) -> int:
+    """Insere ou remplace les couples commune-pivot candidats.
+
+    Parameters
+    ----------
+    conn : sqlite3.Connection
+        Connexion SQLite ouverte.
+    routes : Iterable[CandidateRoute]
+        Couples candidats a persister.
+    clear : bool, default=True
+        Vide la table des candidats avant insertion.
+
+    Returns
+    -------
+    int
+        Nombre de couples candidats traites.
+    """
+
     if clear:
         conn.execute("DELETE FROM candidate_routes")
     now = utc_now()
@@ -209,6 +297,16 @@ def upsert_candidate_routes(
 
 
 def upsert_travel_time(conn: sqlite3.Connection, result: RouteResult) -> None:
+    """Insere ou met a jour un temps de trajet dans le cache.
+
+    Parameters
+    ----------
+    conn : sqlite3.Connection
+        Connexion SQLite ouverte.
+    result : RouteResult
+        Resultat de trajet a persister.
+    """
+
     conn.execute(
         """
         INSERT INTO travel_times (
@@ -249,6 +347,21 @@ def upsert_travel_time(conn: sqlite3.Connection, result: RouteResult) -> None:
 
 
 def fetch_cities(conn: sqlite3.Connection, geocoded_only: bool = False) -> list[CityRecord]:
+    """Retourne les communes stockees dans le cache.
+
+    Parameters
+    ----------
+    conn : sqlite3.Connection
+        Connexion SQLite ouverte.
+    geocoded_only : bool, default=False
+        Limite le resultat aux communes avec coordonnees valides.
+
+    Returns
+    -------
+    list[CityRecord]
+        Communes triees par nom puis code.
+    """
+
     query = "SELECT * FROM cities"
     if geocoded_only:
         query += " WHERE geocode_status = 'ok' AND lat IS NOT NULL AND lon IS NOT NULL"
@@ -262,6 +375,23 @@ def fetch_cities_for_geocode(
     refresh: bool = False,
     only_missing: bool = False,
 ) -> list[CityRecord]:
+    """Retourne les communes a geocoder.
+
+    Parameters
+    ----------
+    conn : sqlite3.Connection
+        Connexion SQLite ouverte.
+    refresh : bool, default=False
+        Selectionne toutes les communes.
+    only_missing : bool, default=False
+        Selectionne uniquement les communes sans coordonnees valides.
+
+    Returns
+    -------
+    list[CityRecord]
+        Communes candidates au geocodage.
+    """
+
     if refresh:
         query = "SELECT * FROM cities ORDER BY name"
     elif only_missing:
@@ -280,6 +410,23 @@ def fetch_candidate_pairs(
     only_missing: bool = True,
     limit: int | None = None,
 ) -> list[sqlite3.Row]:
+    """Retourne les couples candidats prets au calcul de trajet.
+
+    Parameters
+    ----------
+    conn : sqlite3.Connection
+        Connexion SQLite ouverte.
+    only_missing : bool, default=True
+        Exclut les trajets deja calcules.
+    limit : int | None, default=None
+        Limite maximale de couples retournes.
+
+    Returns
+    -------
+    list[sqlite3.Row]
+        Couples avec coordonnees origine et destination.
+    """
+
     query = """
         SELECT cr.*, oc.lat AS origin_lat, oc.lon AS origin_lon,
                dc.lat AS dest_lat, dc.lon AS dest_lon
@@ -311,6 +458,23 @@ def find_city(
     insee_code: str | None = None,
     name: str | None = None,
 ) -> CityRecord | None:
+    """Recherche une commune par code ou par nom.
+
+    Parameters
+    ----------
+    conn : sqlite3.Connection
+        Connexion SQLite ouverte.
+    insee_code : str | None, default=None
+        Code commune recherche.
+    name : str | None, default=None
+        Nom de commune recherche.
+
+    Returns
+    -------
+    CityRecord | None
+        Commune trouvee, ou ``None``.
+    """
+
     if insee_code:
         row = conn.execute("SELECT * FROM cities WHERE insee_code = ?", (insee_code,)).fetchone()
     elif name:
@@ -329,6 +493,25 @@ def get_travel_time(
     destination: str,
     mode: str = "car",
 ) -> sqlite3.Row | None:
+    """Retourne un trajet stocke dans le cache.
+
+    Parameters
+    ----------
+    conn : sqlite3.Connection
+        Connexion SQLite ouverte.
+    origin : str
+        Code commune origine.
+    destination : str
+        Code commune destination.
+    mode : str, default="car"
+        Mode de transport.
+
+    Returns
+    -------
+    sqlite3.Row | None
+        Ligne de trajet, ou ``None`` si absente.
+    """
+
     return conn.execute(
         """
         SELECT * FROM travel_times
@@ -339,6 +522,19 @@ def get_travel_time(
 
 
 def travel_time_stats(conn: sqlite3.Connection) -> dict[str, int]:
+    """Calcule les statistiques globales du cache de trajets.
+
+    Parameters
+    ----------
+    conn : sqlite3.Connection
+        Connexion SQLite ouverte.
+
+    Returns
+    -------
+    dict[str, int]
+        Compteurs de communes, candidats et trajets.
+    """
+
     row = conn.execute(
         """
         SELECT

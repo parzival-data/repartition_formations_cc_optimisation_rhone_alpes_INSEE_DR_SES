@@ -1,3 +1,5 @@
+"""Lecture des CSV de communes pour le calcul de trajets."""
+
 from __future__ import annotations
 
 import csv
@@ -10,10 +12,34 @@ from travel_times.models import CityRecord
 
 
 class DataLoadingError(ValueError):
-    """Raised when an input commune file cannot be loaded safely."""
+    """Erreur de chargement d'un CSV de communes.
+
+    L'exception signale un fichier absent, des colonnes manquantes, des codes
+    dupliques ou des coordonnees invalides.
+    """
 
 
 def read_communes_csv(path: Path, columns: ColumnSettings) -> list[CityRecord]:
+    """Lit un CSV de communes deja nettoyees.
+
+    Parameters
+    ----------
+    path : Path
+        Chemin du CSV de communes.
+    columns : ColumnSettings
+        Mapping des colonnes a lire.
+
+    Returns
+    -------
+    list[CityRecord]
+        Communes avec coordonnees valides, pretes pour les trajets.
+
+    Raises
+    ------
+    DataLoadingError
+        Si le fichier est absent, incomplet ou contient des valeurs invalides.
+    """
+
     if not path.exists():
         raise DataLoadingError(f"Fichier communes introuvable: {path}")
 

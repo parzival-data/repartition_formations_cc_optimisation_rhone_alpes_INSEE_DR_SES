@@ -10,7 +10,35 @@ from cc_formation_optimizer.domain import Compatibility, Commune, FormationSlot,
 
 @dataclass(frozen=True)
 class DerivedParameters:
-    """Parametres derives directement utilises par le futur modele."""
+    """Ensembles et parametres derives directement utilises par le modele.
+
+    Attributes
+    ----------
+    C : tuple[str, ...]
+        Ensemble des communes a affecter.
+    P : tuple[str, ...]
+        Sous-ensemble des communes de categorie PC.
+    T : tuple[str, ...]
+        Sous-ensemble des communes de categorie TPC.
+    F : tuple[str, ...]
+        Ensemble des communes candidates comme pivots.
+    q_i : dict[str, int]
+        Nombre de CC a former pour chaque commune.
+    M_j : dict[str, int]
+        Nombre de slots disponibles par pivot.
+    S : tuple[FormationSlot, ...]
+        Ensemble des slots potentiels ``(pivot, rang)``.
+    tau_ij : dict[tuple[str, str], int]
+        Temps de trajet connus entre commune et pivot.
+    a_ij : dict[tuple[str, str], int]
+        Indicateur de trajet admissible au regard du seuil ``T``.
+    b_ij : dict[tuple[str, str], int]
+        Indicateur de compatibilite metier entre commune et pivot.
+    e_j_PC : dict[str, int]
+        Cout d'eligibilite de chaque pivot pour une session PC.
+    e_j_TPC : dict[str, int]
+        Cout d'eligibilite de chaque pivot pour une session TPC.
+    """
 
     C: tuple[str, ...]
     P: tuple[str, ...]
@@ -27,7 +55,20 @@ class DerivedParameters:
 
 
 def cc_count_for_population(population: int, config: OptimizerConfig) -> int:
-    """Retourne `q_i` selon la regle configuree."""
+    """Retourne ``q_i`` selon la population d'une commune.
+
+    Parameters
+    ----------
+    population : int
+        Population de la commune.
+    config : OptimizerConfig
+        Configuration contenant la regle de calcul des CC.
+
+    Returns
+    -------
+    int
+        Nombre de CC associe a la commune.
+    """
 
     rule = config.parameters.cc_count
     if population <= rule.threshold_population:
@@ -36,7 +77,25 @@ def cc_count_for_population(population: int, config: OptimizerConfig) -> int:
 
 
 def slots_for_commune(commune: Commune, config: OptimizerConfig) -> list[FormationSlot]:
-    """Construit les slots potentiels d'une commune pivot."""
+    """Construit les slots potentiels d'une commune pivot.
+
+    Parameters
+    ----------
+    commune : Commune
+        Commune candidate comme pivot.
+    config : OptimizerConfig
+        Configuration contenant les nombres de slots PC et TPC.
+
+    Returns
+    -------
+    list[FormationSlot]
+        Slots disponibles pour ce pivot.
+
+    Raises
+    ------
+    ValueError
+        Si la categorie de la commune n'est ni ``PC`` ni ``TPC``.
+    """
 
     slots = config.parameters.pivot_slots
     if commune.category == "PC":
@@ -58,6 +117,28 @@ def build_derived_parameters(
 
     Les trajets absents de `travel_times` sont interdits par defaut dans
     `a_ij`. Les compatibilites absentes valent `1` par defaut dans `b_ij`.
+
+    Parameters
+    ----------
+    communes : list[Commune]
+        Communes a affecter et pivots candidats.
+    travel_times : list[TravelTime]
+        Temps de trajet orientes connus.
+    compatibilities : list[Compatibility]
+        Compatibilites metier explicites.
+    config : OptimizerConfig
+        Configuration du modele.
+
+    Returns
+    -------
+    DerivedParameters
+        Parametres ``C, P, T, F, S, q_i, a_ij, b_ij`` et couts de pivots.
+
+    Raises
+    ------
+    ValueError
+        Si une commune est dupliquee, si une categorie est inconnue ou si un
+        trajet/une compatibilite reference une commune inconnue.
     """
 
     commune_by_id = _index_communes(communes)
@@ -92,7 +173,25 @@ def build_derived_parameters(
 
 
 def eligibility_costs_for_population(population: int, config: OptimizerConfig) -> tuple[int, int]:
-    """Retourne `(e_j_PC, e_j_TPC)` selon les bandes configurees."""
+    """Retourne ``(e_j_PC, e_j_TPC)`` selon les bandes configurees.
+
+    Parameters
+    ----------
+    population : int
+        Population du pivot.
+    config : OptimizerConfig
+        Configuration contenant les bandes de cout d'eligibilite.
+
+    Returns
+    -------
+    tuple[int, int]
+        Couts d'eligibilite du pivot pour une session PC puis TPC.
+
+    Raises
+    ------
+    ValueError
+        Si aucune bande de population ne couvre la valeur fournie.
+    """
 
     for band in config.parameters.eligibility_costs.population_bands:
         upper_ok = band.max is None or population <= band.max

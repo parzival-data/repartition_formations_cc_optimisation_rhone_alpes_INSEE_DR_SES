@@ -1,3 +1,5 @@
+"""Interfaces et client offline de calcul de trajets."""
+
 from __future__ import annotations
 
 import math
@@ -9,6 +11,13 @@ from travel_times.models import CityRecord, RouteResult
 
 
 class RouteClient(Protocol):
+    """Interface minimale d'un client de trajet.
+
+    Les implementations doivent retourner un :class:`RouteResult` pour un
+    couple origine-destination, sans lever d'exception pour les trajets
+    simplement indisponibles.
+    """
+
     def route(
         self,
         origin: CityRecord,
@@ -20,7 +29,13 @@ class RouteClient(Protocol):
 
 
 class OfflineRouteClient:
-    """Deterministic no-network route estimator used for tests and dry offline runs."""
+    """Estimateur de trajet deterministe sans appel reseau.
+
+    Parameters
+    ----------
+    settings : RuntimeSettings
+        Parametres de vitesse et facteur de distance.
+    """
 
     def __init__(self, settings: RuntimeSettings) -> None:
         self.settings = settings
@@ -32,6 +47,23 @@ class OfflineRouteClient:
         *,
         requested_by_user: bool = False,
     ) -> RouteResult:
+        """Estime un trajet a partir de la distance a vol d'oiseau.
+
+        Parameters
+        ----------
+        origin : CityRecord
+            Commune origine avec coordonnees.
+        destination : CityRecord
+            Commune destination avec coordonnees.
+        requested_by_user : bool, default=False
+            Marque le trajet comme demande explicitement.
+
+        Returns
+        -------
+        RouteResult
+            Resultat estime ou statut ``skipped`` si les coordonnees manquent.
+        """
+
         if (
             origin.lat is None
             or origin.lon is None

@@ -1,3 +1,5 @@
+"""Client de routage IGN Geoplateforme."""
+
 from __future__ import annotations
 
 import json
@@ -16,6 +18,20 @@ LOGGER = logging.getLogger(__name__)
 
 
 class IgnRouteClient:
+    """Client HTTP pour calculer des trajets routiers IGN.
+
+    Parameters
+    ----------
+    settings : IgnSettings
+        Parametres de routage et de retry.
+    client : httpx.Client | None, default=None
+        Client HTTP injectable pour les tests.
+    rate_limiter : RateLimiter | None, default=None
+        Limiteur d'appels injectable.
+    raw_response_dir : Path | None, default=None
+        Dossier optionnel d'ecriture des reponses brutes de debug.
+    """
+
     def __init__(
         self,
         settings: IgnSettings,
@@ -36,6 +52,24 @@ class IgnRouteClient:
         *,
         requested_by_user: bool = False,
     ) -> RouteResult:
+        """Calcule un trajet oriente entre deux communes.
+
+        Parameters
+        ----------
+        origin : CityRecord
+            Commune origine avec coordonnees.
+        destination : CityRecord
+            Commune destination avec coordonnees.
+        requested_by_user : bool, default=False
+            Marque le trajet comme demande explicitement.
+
+        Returns
+        -------
+        RouteResult
+            Resultat normalise du trajet. Les erreurs HTTP, timeouts et erreurs
+            de parsing sont convertis en statuts de trajet.
+        """
+
         if (
             origin.lat is None
             or origin.lon is None
@@ -161,6 +195,19 @@ class IgnRouteClient:
 
 
 def parse_ign_route_response(payload: Any) -> dict[str, Any]:
+    """Parse une reponse de routage IGN.
+
+    Parameters
+    ----------
+    payload : Any
+        Reponse JSON deja decodee.
+
+    Returns
+    -------
+    dict[str, Any]
+        Duree, distance et statut normalises.
+    """
+
     if not isinstance(payload, dict):
         return {"route_status": "parse_error", "api_error": "response is not a JSON object"}
 

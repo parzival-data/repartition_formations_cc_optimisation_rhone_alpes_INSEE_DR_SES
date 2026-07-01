@@ -28,7 +28,19 @@ PC_TO_TPC_CONSTRAINT_MESSAGE = (
 
 @dataclass(frozen=True)
 class ParameterChange:
-    """Modification explicite d'un parametre pour une tentative."""
+    """Modification explicite d'un parametre pour une tentative.
+
+    Attributes
+    ----------
+    parameter : str
+        Chemin du parametre modifie dans le YAML.
+    old_value : Any
+        Valeur initiale.
+    new_value : Any
+        Valeur testee pour la tentative.
+    reason : str
+        Justification metier de l'assouplissement.
+    """
 
     parameter: str
     old_value: Any
@@ -38,7 +50,37 @@ class ParameterChange:
 
 @dataclass(frozen=True)
 class RelaxationAttempt:
-    """Journal structure d'une tentative de resolution."""
+    """Journal structure d'une tentative de resolution.
+
+    Attributes
+    ----------
+    attempt_id : int
+        Identifiant sequentiel de la tentative.
+    level : int
+        Niveau hierarchique d'assouplissement.
+    level_name : str
+        Nom lisible du niveau.
+    parameter_changes : tuple[ParameterChange, ...]
+        Modifications appliquees pour cette tentative.
+    solver_status : str
+        Statut CP-SAT obtenu.
+    validation_status : str
+        Statut de validation post-solution.
+    objective_total : int | None
+        Objectif total si une solution a ete extraite.
+    obj_trajet : int | None
+        Composante trajet si disponible.
+    obj_eligibilite : int | None
+        Composante eligibilite si disponible.
+    obj_mixite : int | None
+        Composante mixite si disponible.
+    solve_time_seconds : float
+        Temps solveur de la tentative.
+    is_solution_accepted : bool
+        Indique si la tentative est la premiere solution valide retenue.
+    error_message : str | None
+        Erreur de construction, extraction ou validation.
+    """
 
     attempt_id: int
     level: int
@@ -57,7 +99,27 @@ class RelaxationAttempt:
 
 @dataclass(frozen=True)
 class RelaxationResult:
-    """Resultat global du workflow d'assouplissement."""
+    """Resultat global du workflow d'assouplissement.
+
+    Attributes
+    ----------
+    attempts : tuple[RelaxationAttempt, ...]
+        Tentatives executees dans l'ordre hierarchique.
+    accepted_attempt : RelaxationAttempt | None
+        Tentative retenue, si une solution valide existe.
+    final_config : OptimizerConfig | None
+        Configuration finale associee a la tentative retenue.
+    final_model_bundle : ModelBundle | None
+        Modele de la tentative retenue.
+    final_solver_result : SolveResult | None
+        Resultat solveur de la tentative retenue.
+    final_solution : ExtractedSolution | None
+        Solution extraite de la tentative retenue.
+    final_validation_report : ValidationReport | None
+        Rapport de validation de la solution retenue.
+    pc_to_tpc_constraint_note : str
+        Rappel de la contrainte dure non relachee.
+    """
 
     attempts: tuple[RelaxationAttempt, ...]
     accepted_attempt: RelaxationAttempt | None
@@ -75,7 +137,29 @@ def run_relaxation_workflow(
     travel_times: list[TravelTime],
     compatibilities: list[Compatibility],
 ) -> RelaxationResult:
-    """Execute les tentatives dans l'ordre de la hierarchie configuree."""
+    """Execute les tentatives dans l'ordre de la hierarchie configuree.
+
+    Chaque tentative reconstruit les parametres derives, le modele CP-SAT,
+    puis relance resolution, extraction et validation. La premiere solution
+    validee est retenue.
+
+    Parameters
+    ----------
+    initial_config : OptimizerConfig
+        Configuration initiale non modifiee en place.
+    communes : list[Commune]
+        Communes chargees.
+    travel_times : list[TravelTime]
+        Temps de trajet propres.
+    compatibilities : list[Compatibility]
+        Compatibilites metier.
+
+    Returns
+    -------
+    RelaxationResult
+        Journal des tentatives et artefacts de la solution retenue, le cas
+        echeant.
+    """
 
     attempts: list[RelaxationAttempt] = []
     for attempt_id, candidate in enumerate(_candidate_configurations(initial_config)):
@@ -119,7 +203,25 @@ def export_relaxation_reports(
     initial_config_path: str | Path,
     output_dir: str | Path | None,
 ) -> dict[str, Path]:
-    """Exporte le journal, le rapport Markdown et la configuration finale."""
+    """Exporte le journal, le rapport Markdown et la configuration finale.
+
+    La fonction ecrit dans ``reports/`` le JSON des tentatives, le rapport
+    Markdown et, si une solution est retenue, le YAML de configuration finale.
+
+    Parameters
+    ----------
+    result : RelaxationResult
+        Resultat du workflow d'assouplissement.
+    initial_config_path : str | Path
+        Chemin de la configuration initiale mentionnee dans le rapport.
+    output_dir : str | Path | None
+        Racine de sortie optionnelle.
+
+    Returns
+    -------
+    dict[str, Path]
+        Chemins des rapports produits.
+    """
 
     root = Path(output_dir) if output_dir is not None else _default_output_dir(result)
     reports_dir = root / "reports"

@@ -25,6 +25,22 @@ def postprocess_business_rules(
     Les exports d'origine sont uniquement lus. Les propositions sont ecrites
     dans un dossier separe afin de conserver la solution optimisee comme
     reference non modifiee.
+
+    Parameters
+    ----------
+    input_dir : str | Path
+        Racine contenant les exports ``solutions/``.
+    config : OptimizerConfig
+        Configuration de reference pour les contraintes et trajets.
+    output_dir : str | Path | None, default=None
+        Dossier cible des CSV de propositions.
+    min_travel_time_gain_min : int, default=5
+        Gain minimal en minutes pour proposer un rattachement alternatif.
+
+    Returns
+    -------
+    PostprocessResult
+        Chemins et compteurs des CSV produits.
     """
 
     context = load_context(
@@ -39,7 +55,18 @@ def postprocess_business_rules(
 
 
 def build_summary(proposals: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Construit la synthese par regle metier."""
+    """Construit la synthese par regle metier.
+
+    Parameters
+    ----------
+    proposals : list[dict[str, Any]]
+        Propositions produites par les regles metier.
+
+    Returns
+    -------
+    list[dict[str, Any]]
+        Lignes de synthese par regle.
+    """
 
     rows: list[dict[str, Any]] = []
     for rule_id in sorted(RULE_NAMES):
@@ -71,7 +98,13 @@ def build_summary(proposals: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def apply_conflict_hints(proposals: list[dict[str, Any]]) -> None:
-    """Ajoute une alerte si une commune ou une session apparait plusieurs fois."""
+    """Ajoute une alerte si une commune ou une session apparait plusieurs fois.
+
+    Parameters
+    ----------
+    proposals : list[dict[str, Any]]
+        Propositions modifiees en place avec une indication d'arbitrage.
+    """
 
     commune_counts = Counter(row.get("commune_code") for row in proposals if row.get("commune_code"))
     session_counts = Counter(

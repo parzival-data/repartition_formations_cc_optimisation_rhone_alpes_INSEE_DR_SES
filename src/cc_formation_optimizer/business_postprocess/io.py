@@ -24,7 +24,28 @@ def load_context(
     config: OptimizerConfig,
     min_travel_time_gain_min: int,
 ) -> BusinessPostprocessContext:
-    """Charge les exports d'optimisation et les donnees necessaires aux regles."""
+    """Charge les exports d'optimisation et les donnees necessaires aux regles.
+
+    Parameters
+    ----------
+    input_dir : str | Path
+        Racine contenant ``solutions/sessions.csv`` et
+        ``solutions/communes_affectees.csv``.
+    config : OptimizerConfig
+        Configuration permettant de recharger trajets et compatibilites.
+    min_travel_time_gain_min : int
+        Gain minimal utilise par les regles de rattachement.
+
+    Returns
+    -------
+    BusinessPostprocessContext
+        Contexte indexe pour appliquer les regles metier.
+
+    Raises
+    ------
+    PostprocessError
+        Si un export requis est absent, vide ou incomplet.
+    """
 
     root = Path(input_dir)
     sessions = _read_csv(root / "solutions" / "sessions.csv", _required_session_columns())
@@ -51,7 +72,22 @@ def write_outputs(
     proposals: list[dict[str, Any]],
     summary: list[dict[str, Any]],
 ) -> PostprocessResult:
-    """Ecrit les deux CSV de propositions et de synthese."""
+    """Ecrit les deux CSV de propositions et de synthese.
+
+    Parameters
+    ----------
+    output_dir : str | Path
+        Dossier cible des CSV.
+    proposals : list[dict[str, Any]]
+        Propositions metier a ecrire.
+    summary : list[dict[str, Any]]
+        Synthese par regle a ecrire.
+
+    Returns
+    -------
+    PostprocessResult
+        Chemins et compteurs des fichiers produits.
+    """
 
     out_dir = Path(output_dir)
     proposals_csv = out_dir / "business_reallocation_proposals.csv"
@@ -67,7 +103,18 @@ def write_outputs(
 
 
 def default_output_dir(input_dir: str | Path) -> Path:
-    """Retourne le dossier de sortie par defaut de la surcouche."""
+    """Retourne le dossier de sortie par defaut de la surcouche.
+
+    Parameters
+    ----------
+    input_dir : str | Path
+        Racine des exports d'optimisation.
+
+    Returns
+    -------
+    Path
+        Dossier ``postprocess`` sous la racine d'entree.
+    """
 
     return Path(input_dir) / "postprocess"
 

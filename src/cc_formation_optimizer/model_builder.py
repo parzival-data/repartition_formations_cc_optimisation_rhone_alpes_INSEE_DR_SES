@@ -17,7 +17,27 @@ AssignmentKey = tuple[str, str, int]
 
 @dataclass(frozen=True)
 class ModelBundle:
-    """Modele CP-SAT et variables utiles a l'extraction de solution."""
+    """Modele CP-SAT et variables utiles a l'extraction de solution.
+
+    Attributes
+    ----------
+    model : cp_model.CpModel
+        Modele CP-SAT construit.
+    x : dict[AssignmentKey, cp_model.IntVar]
+        Variables d'affectation d'une commune a un slot.
+    y : dict[SlotKey, cp_model.IntVar]
+        Variables d'ouverture de slot.
+    z : dict[SlotKey, cp_model.IntVar]
+        Variables indiquant si le slot ouvert est une session TPC.
+    d : dict[SlotKey, cp_model.IntVar]
+        Variables de mixite residuelle pour les sessions PC.
+    derived : DerivedParameters
+        Parametres derives utilises pour construire le modele.
+    slots : tuple[FormationSlot, ...]
+        Slots potentiels disponibles.
+    objective_terms : dict[str, cp_model.LinearExpr]
+        Composantes non ponderees de l'objectif.
+    """
 
     model: cp_model.CpModel
     x: dict[AssignmentKey, cp_model.IntVar]
@@ -30,7 +50,21 @@ class ModelBundle:
 
 
 def build_model(derived: DerivedParameters, config: OptimizerConfig) -> ModelBundle:
-    """Construit la formulation CP-SAT complete du modele documente."""
+    """Construit la formulation CP-SAT complete du modele.
+
+    Parameters
+    ----------
+    derived : DerivedParameters
+        Ensembles, trajets admissibles, compatibilites et couts de pivots.
+    config : OptimizerConfig
+        Configuration contenant les capacites, budgets et poids d'objectif.
+
+    Returns
+    -------
+    ModelBundle
+        Modele CP-SAT et dictionnaires de variables necessaires a l'extraction
+        de la solution.
+    """
 
     model = cp_model.CpModel()
     slot_keys = tuple((slot.pivot_id, slot.slot_index) for slot in derived.S)

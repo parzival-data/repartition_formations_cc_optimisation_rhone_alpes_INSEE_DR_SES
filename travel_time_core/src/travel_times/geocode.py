@@ -1,3 +1,5 @@
+"""Client de geocodage des communes via geo.api.gouv.fr."""
+
 from __future__ import annotations
 
 import logging
@@ -13,11 +15,22 @@ LOGGER = logging.getLogger(__name__)
 
 
 class RateLimiter:
+    """Limiteur simple d'appels successifs.
+
+    Parameters
+    ----------
+    rate_per_sec : float
+        Nombre maximal d'appels par seconde. Une valeur nulle ou negative
+        desactive l'attente.
+    """
+
     def __init__(self, rate_per_sec: float) -> None:
         self.min_interval = 0.0 if rate_per_sec <= 0 else 1.0 / rate_per_sec
         self._last_call = 0.0
 
     def wait(self) -> None:
+        """Attend le delai necessaire avant l'appel suivant."""
+
         if self.min_interval <= 0:
             return
         now = time.monotonic()
@@ -28,6 +41,18 @@ class RateLimiter:
 
 
 class GeoApiGouvClient:
+    """Client HTTP de geocodage des communes.
+
+    Parameters
+    ----------
+    settings : GeocodeSettings
+        Parametres d'URL, timeout et cadence.
+    client : httpx.Client | None, default=None
+        Client HTTP injectable pour les tests.
+    rate_limiter : RateLimiter | None, default=None
+        Limiteur d'appels injectable.
+    """
+
     def __init__(
         self,
         settings: GeocodeSettings,
@@ -40,6 +65,20 @@ class GeoApiGouvClient:
         self.rate_limiter = rate_limiter or RateLimiter(settings.rate_limit_per_sec)
 
     def geocode_insee(self, insee_code: str) -> GeocodeResult:
+        """Geocode une commune par son code.
+
+        Parameters
+        ----------
+        insee_code : str
+            Code commune a geocoder.
+
+        Returns
+        -------
+        GeocodeResult
+            Resultat normalise. Les erreurs HTTP et timeouts sont convertis en
+            statuts d'erreur.
+        """
+
         self.rate_limiter.wait()
         try:
             response = self.client.get(
@@ -65,6 +104,21 @@ class GeoApiGouvClient:
 
 
 def parse_geo_api_response(insee_code: str, payload: Any) -> GeocodeResult:
+    """Parse la reponse JSON de geo.api.gouv.fr.
+
+    Parameters
+    ----------
+    insee_code : str
+        Code commune demande.
+    payload : Any
+        Reponse JSON deja decodee.
+
+    Returns
+    -------
+    GeocodeResult
+        Resultat de geocodage normalise.
+    """
+
     if not isinstance(payload, list) or not payload:
         LOGGER.warning("Commune INSEE %s non trouvee par geo.api.gouv.fr", insee_code)
         return GeocodeResult(insee_code=insee_code, status="not_found", error="commune not found")

@@ -9,7 +9,18 @@ from cc_formation_optimizer.business_postprocess.types import BusinessPostproces
 
 
 def session_stats(assignments: list[dict[str, Any]]) -> SessionStats:
-    """Recalcule charge, temps maximal, temps moyen et temps total."""
+    """Recalcule charge, temps maximal, temps moyen et temps total.
+
+    Parameters
+    ----------
+    assignments : list[dict[str, Any]]
+        Affectations d'une session.
+
+    Returns
+    -------
+    SessionStats
+        Statistiques recalculees pour la session.
+    """
 
     travel_times = [int_value(row, "temps_trajet_minutes") for row in assignments]
     return SessionStats(
@@ -27,7 +38,24 @@ def constraint_warnings_for_pivot(
     pivot_code: str,
     session_type: str,
 ) -> list[str]:
-    """Controle les contraintes detectables si le pivot d'une session change."""
+    """Controle les contraintes detectables si le pivot d'une session change.
+
+    Parameters
+    ----------
+    context : BusinessPostprocessContext
+        Contexte contenant trajets, compatibilites et configuration.
+    assignments : list[dict[str, Any]]
+        Affectations de la session concernee.
+    pivot_code : str
+        Code du pivot propose.
+    session_type : str
+        Type de session concerne.
+
+    Returns
+    -------
+    list[str]
+        Avertissements non bloquants pour la proposition.
+    """
 
     warnings: list[str] = []
     for assignment in assignments:
@@ -50,7 +78,24 @@ def constraint_warnings_for_reassignment(
     target_session: dict[str, Any],
     target_after: list[dict[str, Any]],
 ) -> list[str]:
-    """Controle les contraintes detectables si une commune change de session."""
+    """Controle les contraintes detectables si une commune change de session.
+
+    Parameters
+    ----------
+    context : BusinessPostprocessContext
+        Contexte contenant trajets, compatibilites et configuration.
+    assignment : dict[str, Any]
+        Affectation de la commune avant proposition.
+    target_session : dict[str, Any]
+        Session cible proposee.
+    target_after : list[dict[str, Any]]
+        Affectations simulees de la session cible apres proposition.
+
+    Returns
+    -------
+    list[str]
+        Avertissements non bloquants pour la proposition.
+    """
 
     warnings: list[str] = []
     target_stats = session_stats(target_after)
@@ -80,7 +125,22 @@ def lower_fill_warnings(
     session_id: str,
     stats_after: SessionStats,
 ) -> list[str]:
-    """Signale si une session source passe sous le minimum L apres retrait."""
+    """Signale si une session source passe sous le minimum L apres retrait.
+
+    Parameters
+    ----------
+    context : BusinessPostprocessContext
+        Contexte contenant la configuration.
+    session_id : str
+        Identifiant de la session source.
+    stats_after : SessionStats
+        Statistiques simulees apres retrait.
+
+    Returns
+    -------
+    list[str]
+        Avertissement si le minimum ``L`` n'est plus respecte.
+    """
 
     if not session_id:
         return []
@@ -93,7 +153,20 @@ def synthetic_assignment_for_pivot(
     target_session: dict[str, Any],
     pivot_assignment: dict[str, Any] | None,
 ) -> dict[str, Any] | None:
-    """Construit une affectation simulee du pivot vers sa propre session."""
+    """Construit une affectation simulee du pivot vers sa propre session.
+
+    Parameters
+    ----------
+    target_session : dict[str, Any]
+        Session dont le pivot doit etre rattache.
+    pivot_assignment : dict[str, Any] | None
+        Affectation actuelle de la commune pivot, si elle existe.
+
+    Returns
+    -------
+    dict[str, Any] | None
+        Affectation simulee, ou ``None`` si le pivot est absent.
+    """
 
     if pivot_assignment is None:
         return None
@@ -109,7 +182,23 @@ def synthetic_assignment_for_pivot(
 
 
 def travel_time(context: BusinessPostprocessContext, commune_code: str, pivot_code: str) -> int | None:
-    """Retourne le temps de trajet connu, avec diagonale nulle."""
+    """Retourne le temps de trajet connu, avec diagonale nulle.
+
+    Parameters
+    ----------
+    context : BusinessPostprocessContext
+        Contexte contenant les temps de trajet.
+    commune_code : str
+        Code de la commune origine.
+    pivot_code : str
+        Code du pivot destination.
+
+    Returns
+    -------
+    int | None
+        Temps de trajet en minutes, ``0`` sur la diagonale ou ``None`` si le
+        trajet est absent.
+    """
 
     if commune_code == pivot_code:
         return 0
@@ -117,13 +206,41 @@ def travel_time(context: BusinessPostprocessContext, commune_code: str, pivot_co
 
 
 def compatibility(context: BusinessPostprocessContext, commune_code: str, pivot_code: str) -> int:
-    """Retourne la compatibilite orientee, autorisee par defaut."""
+    """Retourne la compatibilite orientee, autorisee par defaut.
+
+    Parameters
+    ----------
+    context : BusinessPostprocessContext
+        Contexte contenant les compatibilites explicites.
+    commune_code : str
+        Code de la commune origine.
+    pivot_code : str
+        Code du pivot destination.
+
+    Returns
+    -------
+    int
+        ``0`` si le rattachement est interdit, ``1`` sinon.
+    """
 
     return context.compatibilities.get((commune_code, pivot_code), 1)
 
 
 def int_value(row: dict[str, Any] | None, key: str) -> int:
-    """Convertit une valeur CSV numerique en entier tolerant."""
+    """Convertit une valeur CSV numerique en entier tolerant.
+
+    Parameters
+    ----------
+    row : dict[str, Any] | None
+        Ligne CSV optionnelle.
+    key : str
+        Colonne a convertir.
+
+    Returns
+    -------
+    int
+        Entier parse, ou ``0`` si la valeur est absente ou invalide.
+    """
 
     if row is None:
         return 0

@@ -10,12 +10,30 @@ from cc_formation_optimizer.solution_extractor import ExtractedSolution
 
 
 class SolutionValidationError(ValueError):
-    """Erreur explicite lorsque la solution viole le modele."""
+    """Erreur explicite lorsque la solution viole le modele.
+
+    L'exception est levee des qu'un controle post-solution detecte une
+    affectation, une session, un trajet ou un objectif incoherent.
+    """
 
 
 @dataclass(frozen=True)
 class ValidationReport:
-    """Rapport de validation d'une solution."""
+    """Rapport de validation d'une solution.
+
+    Attributes
+    ----------
+    is_valid : bool
+        Indique si tous les controles ont reussi.
+    checked_constraints : tuple[str, ...]
+        Identifiants des familles de contraintes controlees.
+    total_sessions : int
+        Nombre de sessions ouvertes dans la solution.
+    total_assignments : int
+        Nombre de communes affectees.
+    total_cc : int
+        Nombre total de CC affectes.
+    """
 
     is_valid: bool
     checked_constraints: tuple[str, ...]
@@ -30,7 +48,34 @@ def validate_solution(
     config: OptimizerConfig,
     tolerance: float = 1e-6,
 ) -> ValidationReport:
-    """Valide une solution extraite contre les contraintes du modele."""
+    """Valide une solution extraite contre les contraintes du modele.
+
+    La fonction suppose une solution deja extraite depuis un statut solveur
+    faisable. Elle controle les affectations uniques, ouvertures, capacites,
+    budgets, trajets admissibles, compatibilites, types de sessions, mixite et
+    objectif recalcule.
+
+    Parameters
+    ----------
+    solution : ExtractedSolution
+        Solution extraite a controler.
+    model_bundle : ModelBundle
+        Modele et parametres derives ayant produit la solution.
+    config : OptimizerConfig
+        Configuration contenant les seuils, budgets et poids d'objectif.
+    tolerance : float, default=1e-6
+        Tolerance de comparaison avec l'objectif retourne par le solveur.
+
+    Returns
+    -------
+    ValidationReport
+        Rapport synthetique si tous les controles passent.
+
+    Raises
+    ------
+    SolutionValidationError
+        Si une contrainte controlee est violee.
+    """
 
     sessions_by_id = {session.id_session: session for session in solution.sessions}
     assignments_by_commune: dict[str, list] = {}

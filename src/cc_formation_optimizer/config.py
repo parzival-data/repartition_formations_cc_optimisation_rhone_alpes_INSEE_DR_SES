@@ -10,12 +10,26 @@ import yaml
 
 
 class ConfigError(ValueError):
-    """Erreur de configuration explicite et actionnable."""
+    """Erreur de configuration explicite et actionnable.
+
+    Cette exception est levee quand le YAML est absent, incomplet ou
+    incoherent avec les invariants metier imposes par le modele.
+    """
 
 
 @dataclass(frozen=True)
 class FormationBudgets:
-    """Budgets de formations du modele."""
+    """Budgets globaux de sessions de formation.
+
+    Attributes
+    ----------
+    B : int
+        Nombre maximal total de sessions ouvertes.
+    f : int
+        Nombre maximal de sessions PC.
+    k : int
+        Nombre maximal de sessions TPC.
+    """
 
     B: int
     f: int
@@ -24,7 +38,18 @@ class FormationBudgets:
 
 @dataclass(frozen=True)
 class CcCountRule:
-    """Regle de calcul du nombre de CC a former."""
+    """Regle de calcul du nombre de CC associe a une commune.
+
+    Attributes
+    ----------
+    threshold_population : int
+        Seuil de population separant les communes a 1 CC et 2 CC.
+    below_or_equal : int
+        Nombre de CC pour une commune dont la population est inferieure ou
+        egale au seuil.
+    above : int
+        Nombre de CC pour une commune dont la population depasse le seuil.
+    """
 
     threshold_population: int
     below_or_equal: int
@@ -33,7 +58,15 @@ class CcCountRule:
 
 @dataclass(frozen=True)
 class PivotSlots:
-    """Nombre maximal de formations par pivot selon sa categorie."""
+    """Nombre maximal de slots par pivot selon sa categorie.
+
+    Attributes
+    ----------
+    M_PC : int
+        Nombre maximal de slots pour un pivot PC.
+    M_TPC : int
+        Nombre maximal de slots pour un pivot TPC.
+    """
 
     M_PC: int
     M_TPC: int
@@ -41,7 +74,17 @@ class PivotSlots:
 
 @dataclass(frozen=True)
 class ObjectiveWeights:
-    """Poids de la fonction objectif."""
+    """Poids appliques aux composantes de la fonction objectif.
+
+    Attributes
+    ----------
+    w_t : int
+        Poids de la composante trajet.
+    w_e : int
+        Poids de la composante eligibilite du pivot.
+    w_m : int
+        Poids de la composante mixite.
+    """
 
     w_t: int
     w_e: int
@@ -50,7 +93,19 @@ class ObjectiveWeights:
 
 @dataclass(frozen=True)
 class EligibilityBand:
-    """Bande de population pour les couts d'eligibilite."""
+    """Bande de population pour les couts d'eligibilite des pivots.
+
+    Attributes
+    ----------
+    min : int
+        Borne basse incluse de population.
+    max : int | None
+        Borne haute incluse, ou ``None`` pour une bande ouverte.
+    e_PC : int
+        Cout d'eligibilite si le pivot porte une session PC.
+    e_TPC : int
+        Cout d'eligibilite si le pivot porte une session TPC.
+    """
 
     min: int
     max: int | None
@@ -60,7 +115,16 @@ class EligibilityBand:
 
 @dataclass(frozen=True)
 class EligibilityCosts:
-    """Couts d'eligibilite des pivots."""
+    """Parametres de cout d'eligibilite des pivots.
+
+    Attributes
+    ----------
+    infinity : int
+        Penalite finie utilisee comme cout prohibitif.
+    population_bands : tuple[EligibilityBand, ...]
+        Bandes de population utilisees pour calculer ``e_j_PC`` et
+        ``e_j_TPC``.
+    """
 
     infinity: int
     population_bands: tuple[EligibilityBand, ...]
@@ -68,7 +132,27 @@ class EligibilityCosts:
 
 @dataclass(frozen=True)
 class ModelParameters:
-    """Parametres metier suivant les notations de la modelisation."""
+    """Parametres metier suivant les notations de la modelisation.
+
+    Attributes
+    ----------
+    T : int
+        Seuil maximal de trajet admissible, en minutes.
+    Q : int
+        Capacite maximale d'une session en nombre de CC.
+    L : int
+        Remplissage minimal d'une session ouverte en nombre de CC.
+    formation_budgets : FormationBudgets
+        Budgets de sessions PC, TPC et totales.
+    cc_count : CcCountRule
+        Regle de construction de ``q_i``.
+    pivot_slots : PivotSlots
+        Nombre de slots disponibles par categorie de pivot.
+    objective_weights : ObjectiveWeights
+        Poids de l'objectif CP-SAT.
+    eligibility_costs : EligibilityCosts
+        Regles de calcul des couts d'eligibilite des pivots.
+    """
 
     T: int
     Q: int
@@ -82,7 +166,19 @@ class ModelParameters:
 
 @dataclass(frozen=True)
 class InputPaths:
-    """Chemins des donnees d'entree."""
+    """Chemins des donnees d'entree configurees.
+
+    Attributes
+    ----------
+    communes_path : Path
+        CSV propre des communes.
+    travel_times_path : Path
+        CSV propre des temps de trajet.
+    compatibility_path : Path | None
+        CSV optionnel des compatibilites orientees.
+    missing_travel_time_policy : str
+        Politique appliquee aux trajets absents.
+    """
 
     communes_path: Path
     travel_times_path: Path
@@ -92,7 +188,27 @@ class InputPaths:
 
 @dataclass(frozen=True)
 class OptimizerConfig:
-    """Configuration complete de l'optimiseur."""
+    """Configuration complete de l'optimiseur.
+
+    Attributes
+    ----------
+    metadata : dict[str, Any]
+        Informations descriptives du fichier YAML.
+    inputs : InputPaths
+        Chemins d'entree normalises.
+    columns : dict[str, str]
+        Mapping des colonnes attendues dans les CSV propres.
+    parameters : ModelParameters
+        Parametres du modele et de l'objectif.
+    solver : dict[str, Any]
+        Parametres transmis au solveur CP-SAT.
+    relaxation : dict[str, Any]
+        Parametres du workflow d'assouplissement.
+    exports : dict[str, Any]
+        Parametres des exports.
+    raw : dict[str, Any]
+        Dictionnaire YAML original conserve pour les rapports.
+    """
 
     metadata: dict[str, Any]
     inputs: InputPaths
@@ -105,7 +221,24 @@ class OptimizerConfig:
 
 
 def load_config(path: str | Path) -> OptimizerConfig:
-    """Charge et valide un fichier YAML de configuration."""
+    """Charge et valide un fichier YAML de configuration.
+
+    Parameters
+    ----------
+    path : str | Path
+        Chemin du fichier YAML a charger.
+
+    Returns
+    -------
+    OptimizerConfig
+        Configuration parsee et validee.
+
+    Raises
+    ------
+    ConfigError
+        Si le fichier ne contient pas un objet YAML racine ou si un invariant
+        de configuration est viole.
+    """
 
     config_path = Path(path)
     with config_path.open("r", encoding="utf-8") as stream:
@@ -120,7 +253,24 @@ def load_config(path: str | Path) -> OptimizerConfig:
 
 
 def config_from_dict(raw: dict[str, Any]) -> OptimizerConfig:
-    """Construit et valide une configuration depuis un dictionnaire."""
+    """Construit et valide une configuration depuis un dictionnaire.
+
+    Parameters
+    ----------
+    raw : dict[str, Any]
+        Representation deja chargee du YAML.
+
+    Returns
+    -------
+    OptimizerConfig
+        Configuration parsee et validee.
+
+    Raises
+    ------
+    ConfigError
+        Si une section obligatoire manque ou si un invariant metier est
+        invalide.
+    """
 
     config = _parse_config(raw)
     validate_config(config)
@@ -128,7 +278,19 @@ def config_from_dict(raw: dict[str, Any]) -> OptimizerConfig:
 
 
 def validate_config(config: OptimizerConfig) -> None:
-    """Valide les invariants metier imposes par le modele."""
+    """Valide les invariants metier imposes par le modele.
+
+    Parameters
+    ----------
+    config : OptimizerConfig
+        Configuration parsee a controler.
+
+    Raises
+    ------
+    ConfigError
+        Si les seuils, budgets, slots, poids ou couts d'eligibilite ne sont
+        pas compatibles avec le modele.
+    """
 
     params = config.parameters
     budgets = params.formation_budgets

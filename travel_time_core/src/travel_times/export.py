@@ -1,3 +1,5 @@
+"""Exports des temps de trajet calcules depuis le cache SQLite."""
+
 from __future__ import annotations
 
 import logging
@@ -16,6 +18,21 @@ LOGGER = logging.getLogger(__name__)
 
 
 def export_all(conn: sqlite3.Connection, output_dir: Path) -> dict[str, Path]:
+    """Ecrit tous les exports de communes, candidats, trajets et matrice.
+
+    Parameters
+    ----------
+    conn : sqlite3.Connection
+        Connexion SQLite ouverte.
+    output_dir : Path
+        Dossier de sortie.
+
+    Returns
+    -------
+    dict[str, Path]
+        Chemins des fichiers ODS et CSV produits.
+    """
+
     output_dir.mkdir(parents=True, exist_ok=True)
     LOGGER.info("Preparation de l'export des communes")
     cities = pd.read_sql_query(
@@ -82,6 +99,23 @@ def export_thresholded(
     output_dir: Path,
     thresholds: list[int],
 ) -> dict[str, Path]:
+    """Ecrit des exports filtres par seuil de duree.
+
+    Parameters
+    ----------
+    conn : sqlite3.Connection
+        Connexion SQLite ouverte.
+    output_dir : Path
+        Dossier de sortie.
+    thresholds : list[int]
+        Seuils de duree en minutes.
+
+    Returns
+    -------
+    dict[str, Path]
+        Chemins des fichiers produits par seuil.
+    """
+
     output_dir.mkdir(parents=True, exist_ok=True)
     sparse = travel_times_sparse_df(conn)
     paths: dict[str, Path] = {}
@@ -110,6 +144,21 @@ def export_thresholded(
 
 
 def filter_sparse_by_duration(sparse: pd.DataFrame, max_minutes: int | float) -> pd.DataFrame:
+    """Filtre un export sparse aux trajets OK sous un seuil.
+
+    Parameters
+    ----------
+    sparse : pd.DataFrame
+        Table sparse de trajets.
+    max_minutes : int | float
+        Duree maximale en minutes.
+
+    Returns
+    -------
+    pd.DataFrame
+        Copie filtree de la table sparse.
+    """
+
     if sparse.empty:
         return sparse.copy()
     duration = pd.to_numeric(sparse["duration_min"], errors="coerce")
@@ -117,6 +166,19 @@ def filter_sparse_by_duration(sparse: pd.DataFrame, max_minutes: int | float) ->
 
 
 def travel_times_sparse_df(conn: sqlite3.Connection) -> pd.DataFrame:
+    """Construit la table sparse des trajets stockes.
+
+    Parameters
+    ----------
+    conn : sqlite3.Connection
+        Connexion SQLite ouverte.
+
+    Returns
+    -------
+    pd.DataFrame
+        Trajets orientes avec duree, distance et statut.
+    """
+
     return pd.read_sql_query(
         """
         SELECT
@@ -155,6 +217,21 @@ def travel_times_matrix_minutes_df(
     conn: sqlite3.Connection,
     max_minutes: int | float | None = None,
 ) -> pd.DataFrame:
+    """Construit la matrice des durees en minutes.
+
+    Parameters
+    ----------
+    conn : sqlite3.Connection
+        Connexion SQLite ouverte.
+    max_minutes : int | float | None, default=None
+        Seuil optionnel de duree admissible.
+
+    Returns
+    -------
+    pd.DataFrame
+        Matrice origine-destination en minutes.
+    """
+
     sparse = travel_times_sparse_df(conn)
     cities = pd.read_sql_query(
         "SELECT insee_code, name FROM cities ORDER BY name, insee_code",
@@ -180,6 +257,20 @@ def travel_times_matrix_minutes_df(
 
 
 def optimizer_compatible_travel_times_df(conn: sqlite3.Connection) -> pd.DataFrame:
+    """Construit le CSV compatible avec l'optimiseur de formations.
+
+    Parameters
+    ----------
+    conn : sqlite3.Connection
+        Connexion SQLite ouverte.
+
+    Returns
+    -------
+    pd.DataFrame
+        Colonnes ``code_commune_origine``, ``code_commune_pivot`` et
+        ``temps_minutes``.
+    """
+
     sparse = travel_times_sparse_df(conn)
     if sparse.empty:
         return pd.DataFrame(
@@ -198,12 +289,42 @@ def optimizer_compatible_travel_times_df(conn: sqlite3.Connection) -> pd.DataFra
 
 
 def write_optimizer_compatible_csv(conn: sqlite3.Connection, path: Path) -> Path:
+    """Ecrit le CSV compatible avec l'optimiseur.
+
+    Parameters
+    ----------
+    conn : sqlite3.Connection
+        Connexion SQLite ouverte.
+    path : Path
+        Chemin du CSV a ecrire.
+
+    Returns
+    -------
+    Path
+        Chemin du fichier produit.
+    """
+
     path.parent.mkdir(parents=True, exist_ok=True)
     optimizer_compatible_travel_times_df(conn).to_csv(path, index=False)
     return path
 
 
 def write_generation_report(path: Path, stats: dict[str, Any]) -> Path:
+    """Ecrit le rapport JSON de generation des trajets.
+
+    Parameters
+    ----------
+    path : Path
+        Chemin du JSON a ecrire.
+    stats : dict[str, Any]
+        Statistiques a inclure dans le rapport.
+
+    Returns
+    -------
+    Path
+        Chemin du fichier produit.
+    """
+
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),

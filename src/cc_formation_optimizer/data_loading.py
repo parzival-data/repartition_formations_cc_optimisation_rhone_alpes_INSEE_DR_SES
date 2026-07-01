@@ -11,7 +11,11 @@ from cc_formation_optimizer.domain import Compatibility, Commune, TravelTime
 
 
 class DataLoadingError(ValueError):
-    """Erreur explicite lors du chargement des donnees."""
+    """Erreur explicite lors du chargement des donnees.
+
+    Cette exception signale un fichier absent, un en-tete incomplet, une
+    valeur invalide ou une commune dupliquee dans les CSV propres.
+    """
 
 
 def load_communes(config: OptimizerConfig, base_dir: Path | None = None) -> list[Commune]:
@@ -19,6 +23,24 @@ def load_communes(config: OptimizerConfig, base_dir: Path | None = None) -> list
 
     Les noms de colonnes proviennent exclusivement de la configuration YAML.
     Les identifiants sont normalises par suppression des espaces en bordure.
+
+    Parameters
+    ----------
+    config : OptimizerConfig
+        Configuration contenant le chemin et le mapping des colonnes.
+    base_dir : Path | None, default=None
+        Repertoire de base pour resoudre un chemin relatif.
+
+    Returns
+    -------
+    list[Commune]
+        Communes chargees depuis le CSV propre.
+
+    Raises
+    ------
+    DataLoadingError
+        Si le fichier est absent, si une colonne obligatoire manque ou si une
+        valeur obligatoire est invalide.
     """
 
     columns = config.columns
@@ -63,7 +85,26 @@ def load_communes(config: OptimizerConfig, base_dir: Path | None = None) -> list
 
 
 def load_travel_times(config: OptimizerConfig, base_dir: Path | None = None) -> list[TravelTime]:
-    """Charge les temps de trajet orientes depuis le CSV configure."""
+    """Charge les temps de trajet orientes depuis le CSV configure.
+
+    Parameters
+    ----------
+    config : OptimizerConfig
+        Configuration contenant le chemin et le mapping des colonnes.
+    base_dir : Path | None, default=None
+        Repertoire de base pour resoudre un chemin relatif.
+
+    Returns
+    -------
+    list[TravelTime]
+        Temps de trajet propres, en minutes entieres.
+
+    Raises
+    ------
+    DataLoadingError
+        Si le fichier est absent, si une colonne obligatoire manque ou si un
+        temps de trajet est invalide.
+    """
 
     columns = config.columns
     required = [
@@ -89,6 +130,25 @@ def load_compatibilities(config: OptimizerConfig, base_dir: Path | None = None) 
     Si aucun fichier n'est configure, une liste vide est retournee. Les
     compatibilites absentes seront interpretees comme autorisees par defaut
     lors de la construction de `b_ij`.
+
+    Parameters
+    ----------
+    config : OptimizerConfig
+        Configuration contenant le chemin optionnel et les colonnes.
+    base_dir : Path | None, default=None
+        Repertoire de base pour resoudre un chemin relatif.
+
+    Returns
+    -------
+    list[Compatibility]
+        Compatibilites explicites. Une liste vide signifie qu'aucun fichier
+        n'est configure ou trouve.
+
+    Raises
+    ------
+    DataLoadingError
+        Si le fichier configure existe mais que ses colonnes ou valeurs sont
+        invalides.
     """
 
     if config.inputs.compatibility_path is None:

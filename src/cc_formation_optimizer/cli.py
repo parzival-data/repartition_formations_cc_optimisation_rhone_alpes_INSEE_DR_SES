@@ -21,7 +21,14 @@ from cc_formation_optimizer.validation import SolutionValidationError, validate_
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Construit le parseur CLI."""
+    """Construit le parseur CLI de l'optimiseur.
+
+    Returns
+    -------
+    argparse.ArgumentParser
+        Parseur contenant les commandes de validation, preparation,
+        diagnostic, resolution, export, carte, relaxation et post-traitement.
+    """
 
     parser = argparse.ArgumentParser(prog="cc-formation-optimizer")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -86,7 +93,25 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Point d'entree CLI."""
+    """Point d'entree CLI.
+
+    Parameters
+    ----------
+    argv : list[str] | None, default=None
+        Arguments a parser. ``None`` signifie que ``argparse`` lit les
+        arguments du processus courant.
+
+    Returns
+    -------
+    int
+        Code de sortie de la commande.
+
+    Raises
+    ------
+    SystemExit
+        Via ``argparse`` pour les erreurs d'usage ou de donnees signalees a
+        l'utilisateur.
+    """
 
     parser = build_parser()
     args = parser.parse_args(argv)

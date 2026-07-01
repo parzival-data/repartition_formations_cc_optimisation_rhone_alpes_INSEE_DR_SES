@@ -21,7 +21,18 @@ from cc_formation_optimizer.business_postprocess.types import (
 
 
 def apply_business_rules(context: BusinessPostprocessContext) -> list[dict[str, Any]]:
-    """Applique les trois regles de proposition metier."""
+    """Applique les trois regles de proposition metier.
+
+    Parameters
+    ----------
+    context : BusinessPostprocessContext
+        Exports et donnees de reference charges.
+
+    Returns
+    -------
+    list[dict[str, Any]]
+        Propositions metier produites par les regles R1, R2 et R3.
+    """
 
     proposals: list[dict[str, Any]] = []
     proposals.extend(rule_internal_tpc_pivot(context))
@@ -31,7 +42,18 @@ def apply_business_rules(context: BusinessPostprocessContext) -> list[dict[str, 
 
 
 def rule_internal_tpc_pivot(context: BusinessPostprocessContext) -> list[dict[str, Any]]:
-    """R1: proposer un pivot interne pour une session TPC a pivot externe."""
+    """R1: proposer un pivot interne pour une session TPC a pivot externe.
+
+    Parameters
+    ----------
+    context : BusinessPostprocessContext
+        Contexte de post-traitement charge depuis les exports.
+
+    Returns
+    -------
+    list[dict[str, Any]]
+        Propositions de changement de pivot sans modifier les affectations.
+    """
 
     proposals: list[dict[str, Any]] = []
     for session in context.sessions.values():
@@ -102,7 +124,18 @@ def rule_internal_tpc_pivot(context: BusinessPostprocessContext) -> list[dict[st
 
 
 def rule_reassign_pivot_to_own_session(context: BusinessPostprocessContext) -> list[dict[str, Any]]:
-    """R2: proposer de rattacher une commune pivot a sa propre session."""
+    """R2: proposer de rattacher une commune pivot a sa propre session.
+
+    Parameters
+    ----------
+    context : BusinessPostprocessContext
+        Contexte de post-traitement charge depuis les exports.
+
+    Returns
+    -------
+    list[dict[str, Any]]
+        Propositions de reaffectation de pivots vers leur propre session.
+    """
 
     proposals: list[dict[str, Any]] = []
     for target_session in context.sessions.values():
@@ -181,7 +214,18 @@ def rule_reassign_pivot_to_own_session(context: BusinessPostprocessContext) -> l
 
 
 def rule_closer_same_type_pivot(context: BusinessPostprocessContext) -> list[dict[str, Any]]:
-    """R3: proposer une session de meme type avec un pivot plus proche."""
+    """R3: proposer une session de meme type avec un pivot plus proche.
+
+    Parameters
+    ----------
+    context : BusinessPostprocessContext
+        Contexte de post-traitement charge depuis les exports.
+
+    Returns
+    -------
+    list[dict[str, Any]]
+        Propositions de rattachement vers un pivot plus proche de meme type.
+    """
 
     proposals: list[dict[str, Any]] = []
     for assignment in context.assignments:
@@ -277,7 +321,18 @@ def rule_closer_same_type_pivot(context: BusinessPostprocessContext) -> list[dic
 
 
 def proposal_row(**values: Any) -> dict[str, Any]:
-    """Construit une ligne de proposition avec toutes les colonnes attendues."""
+    """Construit une ligne de proposition avec toutes les colonnes attendues.
+
+    Parameters
+    ----------
+    **values : Any
+        Valeurs a renseigner dans la ligne de proposition.
+
+    Returns
+    -------
+    dict[str, Any]
+        Ligne complete respectant l'ordre des colonnes d'export.
+    """
 
     row = {column: "" for column in PROPOSAL_COLUMNS}
     row.update(values)
@@ -287,6 +342,19 @@ def proposal_row(**values: Any) -> dict[str, Any]:
 
 
 def proposal_id_for(rule_id: str, index: int) -> str:
-    """Construit un identifiant stable au sein d'une regle."""
+    """Construit un identifiant stable au sein d'une regle.
+
+    Parameters
+    ----------
+    rule_id : str
+        Identifiant de regle, par exemple ``R1``.
+    index : int
+        Rang de la proposition dans la regle.
+
+    Returns
+    -------
+    str
+        Identifiant de proposition stable.
+    """
 
     return f"{rule_id}-{index:04d}"

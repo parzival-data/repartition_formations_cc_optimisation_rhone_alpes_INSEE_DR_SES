@@ -12,12 +12,48 @@ from cc_formation_optimizer.solver import SolveResult
 
 
 class SolutionExtractionError(ValueError):
-    """Erreur levee lorsqu'une solution ne peut pas etre extraite."""
+    """Erreur levee lorsqu'une solution ne peut pas etre extraite.
+
+    L'exception signale notamment un statut solveur sans solution exploitable
+    ou une incoherence entre les variables et les communes chargees.
+    """
 
 
 @dataclass(frozen=True)
 class OpenSession:
-    """Session de formation ouverte extraite de la solution."""
+    """Session de formation ouverte extraite de la solution.
+
+    Attributes
+    ----------
+    id_session : str
+        Identifiant stable de session construit a partir du pivot et du rang.
+    code_pivot : str
+        Code de la commune pivot.
+    nom_pivot : str
+        Nom de la commune pivot.
+    categorie_pivot : str
+        Categorie initiale du pivot, ``PC`` ou ``TPC``.
+    rang_m : int
+        Rang du slot ouvert pour ce pivot.
+    type_session : str
+        Type de session decide par le modele, ``PC`` ou ``TPC``.
+    nombre_communes : int
+        Nombre de communes affectees a la session.
+    nombre_CC : int
+        Nombre total de CC affectes a la session.
+    population_min : int
+        Population minimale des communes affectees.
+    population_max : int
+        Population maximale des communes affectees.
+    temps_trajet_max : int
+        Temps de trajet maximal vers le pivot.
+    temps_trajet_moyen : float
+        Temps de trajet moyen vers le pivot.
+    nombre_CC_TPC_dans_session_PC : int
+        Nombre de CC TPC affectes a une session PC.
+    d_jm : int
+        Valeur de la variable de mixite residuelle.
+    """
 
     id_session: str
     code_pivot: str
@@ -37,7 +73,35 @@ class OpenSession:
 
 @dataclass(frozen=True)
 class CommuneAssignment:
-    """Affectation d'une commune a une session ouverte."""
+    """Affectation d'une commune a une session ouverte.
+
+    Attributes
+    ----------
+    code_commune : str
+        Code de la commune affectee.
+    nom_commune : str
+        Nom de la commune affectee.
+    categorie : str
+        Categorie de la commune, ``PC`` ou ``TPC``.
+    territoire_EAR : str | None
+        Territoire EAR de la commune, si disponible.
+    population : int
+        Population de la commune.
+    logements : int | None
+        Nombre de logements, si disponible.
+    nombre_CC : int
+        Nombre de CC associe a la commune.
+    id_session : str
+        Identifiant de la session cible.
+    code_pivot : str
+        Code du pivot de la session.
+    nom_pivot : str
+        Nom du pivot de la session.
+    type_session : str
+        Type de la session cible.
+    temps_trajet_minutes : int
+        Temps de trajet de la commune vers le pivot.
+    """
 
     code_commune: str
     nom_commune: str
@@ -55,7 +119,21 @@ class CommuneAssignment:
 
 @dataclass(frozen=True)
 class ObjectiveBreakdown:
-    """Composantes d'objectif recalculees depuis la solution extraite."""
+    """Composantes d'objectif recalculees depuis la solution extraite.
+
+    Attributes
+    ----------
+    Obj_trajet : int
+        Composante trajet non ponderee.
+    Obj_eligibilite : int
+        Composante eligibilite non ponderee.
+    Obj_mixite : int
+        Composante mixite non ponderee.
+    objectif_total : int
+        Objectif total pondere avec les poids de configuration.
+    solver_objective : float | None
+        Objectif brut retourne par CP-SAT si disponible.
+    """
 
     Obj_trajet: int
     Obj_eligibilite: int
@@ -66,7 +144,19 @@ class ObjectiveBreakdown:
 
 @dataclass(frozen=True)
 class ExtractedSolution:
-    """Solution metier structuree."""
+    """Solution metier structuree.
+
+    Attributes
+    ----------
+    status : str
+        Statut solveur ayant permis l'extraction.
+    sessions : tuple[OpenSession, ...]
+        Sessions ouvertes dans la solution extraite.
+    assignments : tuple[CommuneAssignment, ...]
+        Affectations de communes aux sessions ouvertes.
+    objective : ObjectiveBreakdown
+        Composantes d'objectif recalculees.
+    """
 
     status: str
     sessions: tuple[OpenSession, ...]
@@ -80,7 +170,30 @@ def extract_solution(
     communes: list[Commune],
     config: OptimizerConfig,
 ) -> ExtractedSolution:
-    """Extrait une solution metier si le solveur a trouve une solution."""
+    """Extrait une solution metier si le solveur a trouve une solution.
+
+    Parameters
+    ----------
+    model_bundle : ModelBundle
+        Modele resolu et variables CP-SAT.
+    solver_result : SolveResult
+        Resultat de resolution contenant le solveur et le statut.
+    communes : list[Commune]
+        Communes chargees, utilisees pour enrichir la solution extraite.
+    config : OptimizerConfig
+        Configuration contenant les poids de l'objectif.
+
+    Returns
+    -------
+    ExtractedSolution
+        Sessions ouvertes, affectations et objectif recalcule.
+
+    Raises
+    ------
+    SolutionExtractionError
+        Si le statut solveur n'est ni ``OPTIMAL`` ni ``FEASIBLE`` ou si une
+        commune referencee par une variable est absente des donnees chargees.
+    """
 
     if solver_result.status not in {"OPTIMAL", "FEASIBLE"}:
         raise SolutionExtractionError(f"Impossible d'extraire une solution avec le statut {solver_result.status}.")

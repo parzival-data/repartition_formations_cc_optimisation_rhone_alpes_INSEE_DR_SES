@@ -1,3 +1,5 @@
+"""Configuration du sous-projet de calcul des temps de trajet."""
+
 from __future__ import annotations
 
 import os
@@ -9,6 +11,20 @@ from pydantic import BaseModel, Field
 
 
 class InputSettings(BaseModel):
+    """Parametres des fichiers d'entree.
+
+    Attributes
+    ----------
+    default_ods_path : Path
+        Chemin ODS par defaut.
+    communes_csv_path : Path
+        Chemin CSV des communes deja nettoyees.
+    format : str
+        Format d'entree configure, ``csv`` ou ``ods``.
+    sheet_name : str | int | None
+        Feuille ODS a lire.
+    """
+
     default_ods_path: Path = Path("data/input/villes.ods")
     communes_csv_path: Path = Path("data/input/communes.csv")
     format: str = "csv"
@@ -16,6 +32,26 @@ class InputSettings(BaseModel):
 
 
 class ColumnSettings(BaseModel):
+    """Mapping des colonnes du CSV de communes.
+
+    Attributes
+    ----------
+    code_commune : str
+        Colonne du code commune.
+    nom_commune : str
+        Colonne du nom de commune.
+    categorie : str
+        Colonne de categorie PC/TPC.
+    latitude : str
+        Colonne latitude.
+    longitude : str
+        Colonne longitude.
+    population : str | None
+        Colonne population optionnelle.
+    territoire : str | None
+        Colonne territoire optionnelle.
+    """
+
     code_commune: str = "code_commune"
     nom_commune: str = "nom_commune"
     categorie: str = "categorie"
@@ -26,16 +62,74 @@ class ColumnSettings(BaseModel):
 
 
 class DatabaseSettings(BaseModel):
+    """Parametres du cache SQLite.
+
+    Attributes
+    ----------
+    sqlite_path : Path
+        Chemin de la base SQLite locale.
+    """
+
     sqlite_path: Path = Path("data/cache/travel_times.sqlite")
 
 
 class GeocodeSettings(BaseModel):
+    """Parametres d'appel a geo.api.gouv.fr.
+
+    Attributes
+    ----------
+    base_url : str
+        URL de base de l'API.
+    timeout_sec : float
+        Timeout HTTP en secondes.
+    rate_limit_per_sec : float
+        Nombre maximal d'appels par seconde.
+    """
+
     base_url: str = "https://geo.api.gouv.fr"
     timeout_sec: float = 20
     rate_limit_per_sec: float = 5.0
 
 
 class IgnSettings(BaseModel):
+    """Parametres d'appel au service de routage IGN.
+
+    Attributes
+    ----------
+    get_capabilities_url : str
+        URL de decouverte du service.
+    route_url : str
+        URL de calcul d'itineraire.
+    resource : str
+        Ressource de routage utilisee.
+    profile : str
+        Profil de transport.
+    optimization : str
+        Critere d'optimisation du trajet.
+    distance_unit : str
+        Unite de distance attendue.
+    time_unit : str
+        Unite de temps attendue.
+    crs : str
+        Systeme de coordonnees.
+    get_steps : bool
+        Indique si les etapes doivent etre demandees.
+    get_bbox : bool
+        Indique si la bbox doit etre demandee.
+    timeout_sec : float
+        Timeout HTTP en secondes.
+    rate_limit_per_sec : float
+        Nombre maximal d'appels par seconde.
+    max_retries : int
+        Nombre maximal de tentatives.
+    backoff_initial_sec : float
+        Delai initial de reprise.
+    debug_raw_responses : bool
+        Indique si les reponses brutes doivent etre ecrites.
+    api_key : str | None
+        Jeton API optionnel.
+    """
+
     get_capabilities_url: str = "https://data.geopf.fr/navigation/getCapabilities"
     route_url: str = "https://data.geopf.fr/navigation/itineraire"
     resource: str = "bdtopo-osrm"
@@ -55,12 +149,40 @@ class IgnSettings(BaseModel):
 
 
 class CandidateSettings(BaseModel):
+    """Parametres de generation des couples candidats.
+
+    Attributes
+    ----------
+    k_default : int
+        Nombre de pivots candidats pour une commune standard.
+    k_pc : int
+        Nombre de pivots candidats pour une commune PC.
+    k_tpc : int
+        Nombre de pivots candidats pour une commune TPC.
+    """
+
     k_default: int = Field(default=150, ge=1)
     k_pc: int = Field(default=120, ge=1)
     k_tpc: int = Field(default=100, ge=1)
 
 
 class RuntimeSettings(BaseModel):
+    """Parametres d'execution du calcul des trajets.
+
+    Attributes
+    ----------
+    mode : str
+        Mode de calcul, ``offline`` ou ``ign``.
+    allow_network : bool
+        Autorisation explicite des appels reseau.
+    max_couples : int | None
+        Limite optionnelle du nombre de couples a traiter.
+    offline_speed_kmh : float
+        Vitesse moyenne utilisee en mode offline.
+    offline_distance_factor : float
+        Facteur applique a la distance a vol d'oiseau en mode offline.
+    """
+
     mode: str = "offline"
     allow_network: bool = False
     max_couples: int | None = Field(default=None, ge=1)
@@ -69,6 +191,20 @@ class RuntimeSettings(BaseModel):
 
 
 class OutputSettings(BaseModel):
+    """Parametres des exports de temps de trajet.
+
+    Attributes
+    ----------
+    directory : Path
+        Dossier des exports complets.
+    compatible_csv_path : Path
+        Chemin du CSV compatible avec l'optimiseur.
+    report_json_path : Path
+        Chemin du rapport JSON de generation.
+    thresholds_minutes : list[int]
+        Seuils de duree pour les exports filtres.
+    """
+
     directory: Path = Path("data/output")
     compatible_csv_path: Path = Path("data/output/temps_trajet_clean.csv")
     report_json_path: Path = Path("data/output/generation_report.json")
@@ -76,6 +212,28 @@ class OutputSettings(BaseModel):
 
 
 class Settings(BaseModel):
+    """Configuration complete de `travel_time_core`.
+
+    Attributes
+    ----------
+    input : InputSettings
+        Parametres d'entree.
+    columns : ColumnSettings
+        Mapping des colonnes.
+    database : DatabaseSettings
+        Parametres du cache SQLite.
+    geocode : GeocodeSettings
+        Parametres de geocodage.
+    ign : IgnSettings
+        Parametres de routage IGN.
+    candidates : CandidateSettings
+        Parametres de generation de candidats.
+    runtime : RuntimeSettings
+        Parametres d'execution.
+    output : OutputSettings
+        Parametres d'export.
+    """
+
     input: InputSettings = Field(default_factory=InputSettings)
     columns: ColumnSettings = Field(default_factory=ColumnSettings)
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
@@ -148,6 +306,20 @@ output:
 
 
 def load_settings(path: Path | str = Path("config/settings.yml")) -> Settings:
+    """Charge la configuration de calcul des temps de trajet.
+
+    Parameters
+    ----------
+    path : Path | str, default=Path("config/settings.yml")
+        Chemin du YAML a charger si la variable d'environnement
+        ``TRAVEL_TIMES_CONFIG`` n'est pas definie.
+
+    Returns
+    -------
+    Settings
+        Configuration validee et chemins relatifs resolus.
+    """
+
     config_path = Path(os.getenv("TRAVEL_TIMES_CONFIG", str(path)))
     if not config_path.exists():
         return Settings()
@@ -162,6 +334,14 @@ def load_settings(path: Path | str = Path("config/settings.yml")) -> Settings:
 
 
 def write_default_settings(path: Path) -> None:
+    """Ecrit le YAML de configuration par defaut s'il n'existe pas.
+
+    Parameters
+    ----------
+    path : Path
+        Chemin du fichier YAML a initialiser.
+    """
+
     path.parent.mkdir(parents=True, exist_ok=True)
     if not path.exists():
         path.write_text(DEFAULT_SETTINGS, encoding="utf-8")

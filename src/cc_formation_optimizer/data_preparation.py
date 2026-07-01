@@ -17,12 +17,28 @@ import yaml
 
 
 class DataPreparationError(ValueError):
-    """Erreur explicite pendant la preparation des donnees."""
+    """Erreur explicite pendant la preparation des donnees.
+
+    L'exception est levee pour un dossier brut absent, un fichier introuvable,
+    un format non supporte ou une anomalie bloquante en mode strict.
+    """
 
 
 @dataclass(frozen=True)
 class PreparationIssue:
-    """Anomalie detectee pendant la preparation."""
+    """Anomalie detectee pendant la preparation.
+
+    Attributes
+    ----------
+    severity : str
+        Niveau de l'anomalie, ``blocking`` ou ``non_blocking``.
+    message : str
+        Message exploitable dans le rapport de preparation.
+    file_name : str | None
+        Nom du fichier concerne, si disponible.
+    row_number : int | None
+        Numero de ligne concerne, si disponible.
+    """
 
     severity: str
     message: str
@@ -32,7 +48,29 @@ class PreparationIssue:
 
 @dataclass(frozen=True)
 class PreparationResult:
-    """Resultat complet de la preparation."""
+    """Resultat complet de la preparation des donnees.
+
+    Attributes
+    ----------
+    input_dir : Path
+        Dossier des donnees brutes relu.
+    output_dir : Path
+        Dossier cible des CSV propres.
+    report_dir : Path
+        Dossier cible des rapports optionnels.
+    generated_at : str
+        Horodatage ISO de la preparation.
+    raw_files : tuple[str, ...]
+        Fichiers bruts detectes dans le dossier d'entree.
+    produced_files : tuple[Path, ...]
+        Fichiers CSV propres prevus ou ecrits.
+    stats : dict[str, Any]
+        Statistiques de preparation et transformations appliquees.
+    blocking_issues : tuple[PreparationIssue, ...]
+        Anomalies bloquantes detectees.
+    non_blocking_issues : tuple[PreparationIssue, ...]
+        Anomalies non bloquantes detectees.
+    """
 
     input_dir: Path
     output_dir: Path
@@ -102,7 +140,41 @@ def prepare_data(
     dry_run: bool = False,
     strict: bool = False,
 ) -> PreparationResult:
-    """Prepare les fichiers bruts en CSV propres utilisables par le solveur."""
+    """Prepare les fichiers bruts en CSV propres utilisables par le solveur.
+
+    La fonction lit les fichiers communes, temps de trajet, coordonnees et
+    compatibilites selon la configuration. Hors mode ``dry_run``, elle ecrit
+    les CSV propres dans ``output_dir`` et, si demande, un rapport Markdown et
+    un JSON de statistiques.
+
+    Parameters
+    ----------
+    config_path : str | Path
+        Chemin du YAML contenant la section de preparation.
+    input_dir : str | Path | None, default=None
+        Dossier des donnees brutes. Si absent, la configuration puis les
+        dossiers par defaut sont utilises.
+    output_dir : str | Path | None, default=None
+        Dossier des CSV propres a produire.
+    report : bool, default=False
+        Indique si les rapports de preparation doivent etre ecrits.
+    dry_run : bool, default=False
+        Analyse les fichiers sans ecrire de CSV ni de rapport.
+    strict : bool, default=False
+        Leve une erreur si des anomalies bloquantes sont detectees.
+
+    Returns
+    -------
+    PreparationResult
+        Synthese des fichiers lus, fichiers produits et anomalies detectees.
+
+    Raises
+    ------
+    DataPreparationError
+        Si le dossier d'entree est introuvable, si un fichier obligatoire est
+        absent ou invalide, ou si ``strict`` est actif avec des anomalies
+        bloquantes.
+    """
 
     config_path = Path(config_path)
     raw_config = _load_raw_config(config_path)
