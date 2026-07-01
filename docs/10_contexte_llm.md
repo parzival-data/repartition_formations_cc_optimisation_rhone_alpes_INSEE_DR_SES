@@ -1,6 +1,6 @@
 # CONTEXTE LLM - cc-formation-optimizer
 
-Version du contexte : 2026-06-25
+Version du contexte : 2026-07-01
 Public cible : modèle LLM / agent de code autonome
 Objectif : fournir une fenêtre de contexte suffisamment complété pour reprendre
 le projet sans historique de conversation et sans lecture obligatoire du reste
@@ -14,7 +14,8 @@ dépôt au moment de la rédaction.
 
 Priorites pour toute IA qui reprend le projet :
 
-1. Commencer par `git status --short`, `git log --oneline -15`, puis `pytest`.
+1. Commencer par `git status --short`, `git log --oneline -15`, `pytest`, puis
+   `pytest travel_time_core\tests` si le sous-projet de trajets est concerne.
 2. Ne pas modifier le modèle mathématique sans demande explicite.
 3. Ne pas modifier les paramètres métier YAML sans demande explicite.
 4. Ne pas relancer `solve` ou `solve-relaxed` sur les données réelles sans accord
@@ -62,14 +63,14 @@ Le projet a deux blocs fonctionnels :
 Derniers commits visibles :
 
 ```text
-e6129fb readme
-d314042 feat: add business postprocessing proposals
-ddc34a6 docs: add algorithmic model latex document
-2f31afd docs: add AI handoff summary
-374b3a1 docs: fix latex rendering in algorithmic documentation
-8f9beac docs: simplify algorithmic latex notation
-8597376 docs: polish complete algorithmic documentation
-9d33142 docs: align documentation with implemented pipeline
+6faecba test: align config expectations
+2160b27 docs: add numpy-style docstrings
+6173c09 hjk
+c5e165a gfds
+197878f fds
+f098244 feat: stabilize independent travel time core
+4a4d2bc hjkl
+07b9994 documentation
 ```
 
 État fonctionnel vérifie recemment :
@@ -77,6 +78,9 @@ ddc34a6 docs: add algorithmic model latex document
 ```text
 pytest
 81 passed
+
+pytest travel_time_core\tests
+31 passed
 ```
 
 Attention : le nombre de tests peut changer. Toujours vérifier localement.
@@ -112,6 +116,7 @@ donnee_brut_EAR27/
 outputs/
 src/cc_formation_optimizer/
 tests/
+travel_time_core/
 ```
 
 Sous-package principal :
@@ -174,6 +179,17 @@ tests/
   test_validation.py
   fixtures/
 ```
+
+Sous-projet de calcul des temps de trajet :
+
+```text
+travel_time_core/
+  src/travel_times/
+  tests/
+  pyproject.toml
+```
+
+Il reste indépendant de l'optimiseur et communique avec lui par fichiers CSV/ODS.
 
 ## 4. Fichiers ignorés et règles de commit
 
@@ -238,18 +254,18 @@ compatibility_allowed: compatible
 Paramètres métier courants :
 
 ```text
-T = 75
+T = 60
 Q = 14
 L = 6
 B = 55
-f = 45
-k = 10
+f = 50
+k = 5
 B = f + k
 M_PC = 3
 M_TPC = 1
-w_t = 1
+w_t = 100
 w_e = 1000
-w_m = 500
+w_m = 20
 threshold_population = 5000
 q_i = 1 si population <= 5000, sinon 2
 ```
@@ -257,7 +273,7 @@ q_i = 1 si population <= 5000, sinon 2
 Solveur courant :
 
 ```text
-time_limit_seconds = 2400
+time_limit_seconds = 1200
 num_workers = 8
 random_seed = 1
 log_search_progress = true
@@ -328,7 +344,8 @@ communes = 543
 PC = 342
 TPC = 201
 CC = 573
-trajets prepares/admissibles avec T=75 = 47 698
+trajets prepares dans `data/processed/temps_trajet_clean.csv` = 47 698
+seuil courant d'admissibilite du modele T = 60
 coordonnees = 543/543
 ```
 
@@ -586,28 +603,35 @@ Depuis `outputs/reports/statistiques_solution.json` :
 ```text
 solver_status = FEASIBLE
 validation_status = OK
-objective_total = 148759
-obj_trajet = 18259
-obj_eligibilite = 100
-obj_mixite = 61
+objective_total = 2116880
+obj_trajet = 12654
+obj_eligibilite = 1100
+obj_mixite = 152
 nombre_communes = 543
 nombre_communes_affectees = 543
 nombre_CC = 573
 sessions_ouvertes = 55
 B = 55
-sessions_PC = 45
-f = 45
-sessions_TPC = 10
-k = 10
+sessions_PC = 50
+f = 50
+sessions_TPC = 5
+k = 5
 Q = 14
 L = 6
-T = 75
-temps_moyen_global = 32.54
-temps_max_global = 74
+T = 60
+temps_moyen_global = 22.64
+temps_max_global = 60
 sessions_sous_remplies = 0
-sessions_saturees = 17
+sessions_saturees = 14
 violations = []
 ```
+
+Attention : ces exports existants ont ete produits avec
+`outputs/reports/config_utilisee.yaml`, qui indique `w_t = 80`, `w_e = 1000` et
+`w_m = 30`. Le YAML courant `config/config_ear2027.yaml` indique maintenant
+`w_t = 100`, `w_e = 1000` et `w_m = 20`. Ne pas presenter l'objectif total des
+exports existants comme recalcule avec les poids courants sans relancer le
+solveur ou recalculer explicitement la solution.
 
 Warnings exportes :
 
@@ -625,7 +649,7 @@ Interprétation :
 
 - `FEASIBLE` = solution valide trouvée, optimalité non prouvée.
 - La validation est OK.
-- Les budgets sont satures : 55/55, 45/45, 10/10.
+- Les budgets sont satures : 55/55, 50/50, 5/5.
 - La solution est exploitable comme candidate, pas comme preuve d'optimum.
 
 ## 12. Exports d'optimisation
@@ -787,9 +811,9 @@ Conflits :
 Résultat actuel de la surcouche sur `outputs/` :
 
 ```text
-R1: 10 propositions, 10 compatibles, 0 non compatibles, gain total 751
-R2: 7 propositions, 0 compatibles, 7 non compatibles, gain total 251
-R3: 44 propositions, 5 compatibles, 39 non compatibles, gain total 611
+R1: 4 propositions, 3 compatibles, 1 non compatible, gain total 138
+R2: 3 propositions, 0 compatibles, 3 non compatibles, gain total 86
+R3: 6 propositions, 0 compatibles, 6 non compatibles, gain total 53
 ```
 
 ## 15. Tests
@@ -798,12 +822,14 @@ Commande :
 
 ```powershell
 pytest
+pytest travel_time_core\tests
 ```
 
 État vérifie recemment :
 
 ```text
 81 passed
+31 passed dans travel_time_core
 ```
 
 Tests de surcouche :
@@ -850,7 +876,8 @@ Rôle :
 
 - `README.md` : document d'entrée humain.
 - `docs/09_modelisation_algorithmique_complete.*` : explication complété du
-  modèle et de l'algorithme.
+  modèle et de l'algorithme. Si le PDF n'a pas été régénéré, les sources `.md`
+  et `.tex` font foi.
 - `docs/11_surcouche_metier_post_optimisation.md` : doc humaine de la surcouche.
 - `docs/10_contexte_llm.md` : contexte technique pour IA.
 

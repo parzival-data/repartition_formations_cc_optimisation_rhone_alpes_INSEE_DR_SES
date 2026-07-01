@@ -24,7 +24,7 @@ Le dossier brut inspecte contient :
 - `villes_rhone_alpes.ods` : même structuré que `info_minimum.ods`.
 - `matrice_temps_trajets_complete.ods` : matrice large des temps.
 - `matrice_temps_trajets_max_60min.ods` : matrice large filtrée.
-- `matrice_temps_trajets_max_90min.ods` : matrice large filtrée utilisée par défaut avec `T=90`.
+- `matrice_temps_trajets_max_90min.ods` : matrice large filtrée configurée comme source brute. Le seuil dur courant du modèle reste `T=60` et est appliqué ensuite lors de la construction de `a_ij`.
 - `matrice_temps_trajets_max_120min.ods` : matrice large filtrée.
 - `cities_geocoded.ods` : coordonnées latitude/longitude des communes.
 

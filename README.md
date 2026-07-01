@@ -93,6 +93,16 @@ modèle, les paramètres solveur, les assouplissements et les options d'exports.
 Elle pilote notamment `T`, `Q`, `L`, les budgets `B`, `f`, `k`, les pondérations
 d'objectif et les niveaux d'assouplissement.
 
+État actuel de `config/config_ear2027.yaml` :
+
+```text
+T=60, Q=14, L=6
+B=55, f=50, k=5
+M_PC=3, M_TPC=1
+w_t=100, w_e=1000, w_m=20
+time_limit_seconds=1200, num_workers=8, random_seed=1
+```
+
 Le fichier suivant documente le schéma attendu :
 
 ```text
@@ -315,7 +325,8 @@ entre les deux projets. Voir [`travel_time_core/README.md`](travel_time_core/REA
 - [`docs/09_modelisation_algorithmique_complete.tex`](docs/09_modelisation_algorithmique_complete.tex) :
   version LaTeX autonome de la modélisation algorithmique.
 - [`docs/09_modelisation_algorithmique_complete.pdf`](docs/09_modelisation_algorithmique_complete.pdf) :
-  version PDF compilée.
+  version PDF compilée lorsque l'outillage LaTeX est disponible ; les sources
+  `.md` et `.tex` font foi si le PDF n'a pas pu être régénéré localement.
 - [`docs/10_contexte_llm.md`](docs/10_contexte_llm.md) :
   contexte technique structuré pour reprise par un LLM.
 - [`docs/11_surcouche_metier_post_optimisation.md`](docs/11_surcouche_metier_post_optimisation.md) :

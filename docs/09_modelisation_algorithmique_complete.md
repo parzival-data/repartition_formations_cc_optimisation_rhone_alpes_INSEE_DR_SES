@@ -633,14 +633,14 @@ Les paramètres solveur de config_ear2027.yaml sont :
 
 | Paramètre | Valeur actuelle | Justification |
 | --- | ---: | --- |
-| time_limit_seconds | 2400 | limite de 40 minutes ; elle évite une exécution non bornée tout en laissant au solveur le temps de trouver une solution et d'améliorer la preuve |
+| time_limit_seconds | 1200 | limite de 20 minutes ; elle évite une exécution non bornée tout en laissant au solveur le temps de trouver une solution et d'améliorer la preuve |
 | num_workers | 8 | exploite le parallélisme disponible pour diversifier la recherche CP-SAT sans modifier le modèle |
 | random_seed | 1 | stabilise les décisions pseudo-aléatoires pour rendre les comparaisons de runs plus reproductibles |
 | log_search_progress | true | conserve une trace exploitable de la progression, utile pour distinguer absence de solution, manque de temps et lenteur de preuve |
 
 La limite de temps est cohérente avec la documentation OR-Tools, qui recommande
 de borner la recherche pour garantir que le programme termine dans un délai
-raisonnable. Ici, 2400 secondes est un compromis opérationnel : assez long pour
+raisonnable. Ici, 1200 secondes est un compromis opérationnel : assez long pour
 un modèle départemental ou régional dense, mais suffisamment borné pour rester
 auditable.
 
@@ -658,20 +658,20 @@ Les paramètres métier actuellement utilisés sont :
 
 | Paramètre | Valeur actuelle | Rôle dans le modèle |
 | --- | ---: | --- |
-| T | 75 | temps maximal admissible entre une commune et son pivot |
+| T | 60 | temps maximal admissible entre une commune et son pivot |
 | Q | 14 | capacité maximale d'une session en nombre de CC |
 | L | 6 | remplissage minimal d'une session ouverte |
 | B | 55 | budget total déclaré de sessions |
-| f | 45 | budget maximal de sessions PC |
-| k | 10 | budget maximal de sessions TPC |
+| f | 50 | budget maximal de sessions PC |
+| k | 5 | budget maximal de sessions TPC |
 | threshold_population | 5000 | seuil au-dessus duquel une commune compte pour deux CC |
 | below_or_equal | 1 | nombre de CC pour une commune de population inférieure ou égale au seuil |
 | above | 2 | nombre de CC pour une commune au-dessus du seuil |
 | M_PC | 3 | nombre maximal de slots candidats pour un pivot PC |
 | M_TPC | 1 | nombre maximal de slots candidats pour un pivot TPC |
 
-Le seuil T: 75 est un choix structurant : il retire du modèle tous les couples
-commune-pivot au-delà de 75 minutes. Cette valeur contrôle à la fois la
+Le seuil T: 60 est un choix structurant : il retire du modèle tous les couples
+commune-pivot au-delà de 60 minutes. Cette valeur contrôle à la fois la
 faisabilité et la taille du modèle. Un seuil plus bas réduirait le nombre de
 variables x, mais augmenterait le risque de communes sans affectation. Un seuil
 plus haut rendrait davantage d'affectations possibles, mais élargirait la
@@ -683,7 +683,7 @@ une session n'est pas ouverte pour un effectif marginal, mais elle peut accueill
 des combinaisons de communes de tailles différentes. Le solveur peut ainsi
 arbitrer entre proximité, type de session et remplissage.
 
-Les budgets f: 45 et k: 10 sont les contraintes directement utilisées pour
+Les budgets f: 50 et k: 5 sont les contraintes directement utilisées pour
 compter les sessions PC et TPC. Le budget total B: 55 est cohérent avec B = f + k ;
 il sert de garde-fou de configuration et de lecture métier. Cette séparation est
 préférable à un seul budget global, car une solution avec trop de sessions TPC
@@ -729,21 +729,23 @@ Les poids actuels sont :
 
 | Poids | Valeur actuelle | Composante |
 | --- | ---: | --- |
-| w_t | 1 | temps de trajet pondéré par le nombre de CC |
+| w_t | 100 | temps de trajet pondéré par le nombre de CC |
 | w_e | 1000 | coûts d'éligibilité des pivots |
-| w_m | 500 | mixité résiduelle TPC dans les sessions PC |
+| w_m | 20 | mixité résiduelle TPC dans les sessions PC |
 
-Le poids w_t: 1 conserve le trajet comme unité de base. Une minute supplémentaire
-pour une commune à un CC coûte 1 ; pour une commune à deux CC, elle coûte 2. Ce
-choix rend la composante trajet lisible : elle mesure des minutes-personnes de
-formation, avant arbitrage avec les autres dimensions.
+Le poids w_t: 100 valorise fortement la réduction des temps de trajet tout en
+conservant une lecture simple : une minute supplémentaire pour une commune à un
+CC coûte 100 unités d'objectif ; pour une commune à deux CC, elle coûte 200.
+La composante trajet reste donc exprimée en minutes-CC avant pondération, puis
+comparée aux pénalités d'éligibilité et de mixité.
 
 Le poids w_e: 1000 donne une priorité forte à l'éligibilité des pivots. Par
 exemple, utiliser un pivot PC de bande 1000-1500 ajoute 100 * 1000 = 100000
 unités d'objectif ; utiliser un pivot PC de bande 500-999 ajoute 500 * 1000 =
-500000. Ces ordres de grandeur dépassent largement quelques dizaines de minutes
-de trajet. Le modèle préfère donc normalement un pivot plus éligible, même si
-cela impose un trajet un peu plus long, tant que le seuil dur T reste respecté.
+500000. Avec `w_t=100`, ces ordres de grandeur dépassent encore plusieurs
+milliers de minutes-CC. Le modèle préfère donc normalement un pivot plus
+éligible, même si cela impose un trajet un peu plus long, tant que le seuil dur
+T reste respecté.
 
 Ce choix est justifié si l'éligibilité du pivot représente une préférence métier
 plus importante que l'optimisation fine des minutes. Il évite qu'une petite
@@ -752,27 +754,25 @@ adaptés. En revanche, il faut lire les résultats en gardant cette hiérarchie 
 tête : le solveur optimise d'abord fortement la qualité des pivots, puis affine
 les trajets à l'intérieur de cette structure.
 
-Le poids w_m: 500 pénalise chaque CC TPC placé dans une session PC. Cette
-pénalité vaut l'équivalent objectif de 500 minutes-personnes de trajet. Elle est
-donc suffisamment élevée pour éviter la mixité résiduelle quand une solution TPC
-propre existe, mais elle reste inférieure à une pénalité d'éligibilité moyenne
-pondérée par w_e. Ainsi, le modèle préfère généralement ouvrir et remplir des
-sessions TPC, sans rendre impossible l'affectation de TPC en session PC lorsque
-les contraintes de trajet, de capacité ou de budget ne permettent pas mieux.
+Le poids w_m: 20 pénalise chaque CC TPC placé dans une session PC. Cette
+pénalité est volontairement plus faible que le poids de trajet courant : elle
+signale la mixité résiduelle sans l'emporter mécaniquement sur des gains de
+trajet importants. Elle reste aussi nettement inférieure aux pénalités
+d'éligibilité pondérées par w_e, de sorte que la qualité des pivots demeure un
+arbitrage structurant.
 
 L'ordre de priorité induit par les poids actuels est donc :
 
 1. respecter toutes les contraintes dures, sans exception ;
 2. éviter les pivots peu éligibles, surtout pour les sessions PC ;
-3. limiter la mixité TPC résiduelle dans les sessions PC ;
-4. minimiser les temps de trajet parmi les solutions qui satisfont ces
-   arbitrages.
+3. minimiser fortement les temps de trajet ;
+4. limiter la mixité TPC résiduelle dans les sessions PC quand cet arbitrage ne
+   dégrade pas excessivement les autres composantes.
 
 Cet ordre est cohérent avec une lecture métier où la solution doit d'abord être
-opérationnellement acceptable, puis géographiquement efficace. Les temps de
-trajet ne sont pas ignorés : ils départagent toutes les solutions comparables en
-éligibilité et en mixité. Ils sont simplement placés derrière les pénalités qui
-expriment les préférences structurelles du modèle.
+faisable, puis arbitrer entre qualité des pivots, proximité géographique et
+mixité résiduelle. Avec les poids courants, les temps de trajet pèsent fortement
+dans l'objectif, tandis que la mixité reste une pénalité d'alerte plus modérée.
 
 ### 9.9 Lecture opérationnelle des sorties CP-SAT
 
