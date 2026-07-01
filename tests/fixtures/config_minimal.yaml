@@ -38,9 +38,9 @@ parameters:
     M_PC: 3
     M_TPC: 1
   objective_weights:
-    w_t: 1
+    w_t: 100
     w_e: 1000
-    w_m: 500
+    w_m: 20
   eligibility_costs:
     infinity: 1000000000
     population_bands:

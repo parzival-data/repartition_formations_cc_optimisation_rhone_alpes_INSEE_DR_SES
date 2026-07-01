@@ -24,9 +24,9 @@ def test_load_minimal_config_uses_model_notation() -> None:
     assert params.formation_budgets.k == 10
     assert params.pivot_slots.M_PC == 3
     assert params.pivot_slots.M_TPC == 1
-    assert params.objective_weights.w_t == 1
+    assert params.objective_weights.w_t == 100
     assert params.objective_weights.w_e == 1000
-    assert params.objective_weights.w_m == 500
+    assert params.objective_weights.w_m == 20
 
 
 def test_main_config_is_valid() -> None:
@@ -35,10 +35,10 @@ def test_main_config_is_valid() -> None:
     budgets = config.parameters.formation_budgets
 
     assert budgets.B == budgets.f + budgets.k
-    assert config.parameters.T == 75
+    assert config.parameters.T == 60
     assert config.parameters.Q == 14
     assert config.parameters.L == 6
-    assert config.solver["time_limit_seconds"] == 2400
+    assert config.solver["time_limit_seconds"] == 1200
 
 
 def test_rejects_budget_inconsistent_with_model(tmp_path: Path) -> None:
