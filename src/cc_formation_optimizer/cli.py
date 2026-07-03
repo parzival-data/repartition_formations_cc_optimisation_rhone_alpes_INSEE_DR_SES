@@ -10,6 +10,7 @@ from cc_formation_optimizer.data_preparation import DataPreparationError, prepar
 from cc_formation_optimizer.data_loading import DataLoadingError, load_communes, load_compatibilities, load_travel_times
 from cc_formation_optimizer.diagnostics import run_pre_solve_diagnostics
 from cc_formation_optimizer.export import ExportError, export_solution
+from cc_formation_optimizer.guided_run import GuidedRunError, GuidedRunOptions, run_guided
 from cc_formation_optimizer.map_export import MapExportError, export_solution_map, render_map_from_exports
 from cc_formation_optimizer.model_builder import build_model
 from cc_formation_optimizer.parameters import build_derived_parameters
@@ -46,6 +47,20 @@ def build_parser() -> argparse.ArgumentParser:
     prepare.add_argument("--report", action="store_true", help="Produit le rapport Markdown et les statistiques JSON.")
     prepare.add_argument("--dry-run", action="store_true", help="Analyse sans ecrire de fichiers.")
     prepare.add_argument("--strict", action="store_true", help="Echoue en presence d'anomalies bloquantes.")
+
+    guided = subparsers.add_parser(
+        "guided-run",
+        help="Guide pas a pas un utilisateur non expert dans tout le pipeline.",
+    )
+    guided.add_argument("--config", type=Path, default=Path("config/config_ear2027.yaml"))
+    guided.add_argument("--yes", action="store_true", help="Confirme automatiquement les etapes non longues.")
+    guided.add_argument("--skip-travel-times", action="store_true", help="Ignore l'etape travel_time_core.")
+    guided.add_argument("--skip-solve", action="store_true", help="Ne lance pas le solveur.")
+    guided.add_argument("--skip-map", action="store_true", help="Ne regenere pas la carte seule.")
+    guided.add_argument("--skip-postprocess", action="store_true", help="Ignore la surcouche metier.")
+    guided.add_argument("--input-dir", type=Path, default=None, help="Dossier des fichiers bruts.")
+    guided.add_argument("--processed-dir", type=Path, default=None, help="Dossier des CSV propres.")
+    guided.add_argument("--output-dir", type=Path, default=None, help="Dossier racine des exports.")
 
     diagnose = subparsers.add_parser("diagnose", help="Lance le diagnostic pre-resolution sans resoudre.")
     diagnose.add_argument("--config", type=Path, default=Path("config/config_ear2027.yaml"))
@@ -115,6 +130,24 @@ def main(argv: list[str] | None = None) -> int:
 
     parser = build_parser()
     args = parser.parse_args(argv)
+
+    if args.command == "guided-run":
+        try:
+            return run_guided(
+                GuidedRunOptions(
+                    config_path=args.config,
+                    yes=args.yes,
+                    skip_travel_times=args.skip_travel_times,
+                    skip_solve=args.skip_solve,
+                    skip_map=args.skip_map,
+                    skip_postprocess=args.skip_postprocess,
+                    input_dir=args.input_dir,
+                    processed_dir=args.processed_dir,
+                    output_dir=args.output_dir,
+                )
+            )
+        except GuidedRunError as exc:
+            parser.exit(status=2, message=f"Erreur execution guidee: {exc}\n")
 
     if args.command == "prepare-data":
         try:
