@@ -114,6 +114,28 @@ Pour le détail des champs et des invariants, voir
 
 ## Commandes principales
 
+### Lancer l'execution guidee
+
+```powershell
+cc-formation-optimizer guided-run --config config/config_ear2027.yaml
+```
+
+Guide un utilisateur non expert et enchaine les controles utiles : fichiers
+bruts, preparation, controle des diagonales de temps de trajet, diagnostic,
+optimisation, exports, carte et surcouche metier. Les etapes longues comme le
+calcul des temps de trajet et le solveur demandent toujours confirmation.
+
+Options utiles :
+
+- `--yes` : confirme automatiquement les etapes courtes ;
+- `--skip-travel-times` : ne lance pas `travel_time_core` ;
+- `--skip-solve` : ne lance pas le solveur ;
+- `--skip-map` : ne regenere pas la carte seule ;
+- `--skip-postprocess` : ne lance pas la surcouche metier ;
+- `--input-dir`, `--processed-dir`, `--output-dir` : remplacent les dossiers par defaut.
+
+Voir [`docs/12_execution_guidee.md`](docs/12_execution_guidee.md).
+
 ### Valider la configuration
 
 ```bash
@@ -331,6 +353,11 @@ entre les deux projets. Voir [`travel_time_core/README.md`](travel_time_core/REA
   contexte technique structuré pour reprise par un LLM.
 - [`docs/11_surcouche_metier_post_optimisation.md`](docs/11_surcouche_metier_post_optimisation.md) :
   documentation dédiée à la surcouche métier.
+- [`docs/12_execution_guidee.md`](docs/12_execution_guidee.md) :
+  guide utilisateur de la commande interactive `guided-run`.
+- [`docs/rapport_technique_complet.tex`](docs/rapport_technique_complet.tex) :
+  document LaTeX consolidé couvrant la modélisation, les exports, la surcouche
+  métier et l'annexe de production des matrices de temps.
 
 ## Tests
 

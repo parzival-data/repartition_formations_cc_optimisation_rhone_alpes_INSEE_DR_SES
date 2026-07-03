@@ -111,6 +111,8 @@ docs/
   09_modelisation_algorithmique_complete.pdf
   10_contexte_llm.md
   11_surcouche_metier_post_optimisation.md
+  12_execution_guidee.md
+  rapport_technique_complet.tex
 
 donnee_brut_EAR27/
 outputs/
@@ -130,6 +132,7 @@ src/cc_formation_optimizer/
   diagnostics.py
   domain.py
   export.py
+  guided_run.py
   logging_utils.py
   map_export.py
   model_builder.py
@@ -367,6 +370,7 @@ solve
 solve-relaxed
 render-map
 postprocess-business-rules
+guided-run
 ```
 
 Exemples :
@@ -406,6 +410,16 @@ cc-formation-optimizer render-map --config config/config_ear2027.yaml --solution
 ```powershell
 cc-formation-optimizer postprocess-business-rules --config config/config_ear2027.yaml --input-dir outputs --output-dir outputs/postprocess --min-travel-time-gain-min 5
 ```
+
+Commande guidee pour utilisateur non expert :
+
+```powershell
+cc-formation-optimizer guided-run --config config/config_ear2027.yaml
+```
+
+Elle orchestre les controles, la preparation, les diagonales de temps, le
+diagnostic, l'optimisation optionnelle, les exports et la surcouche metier. Elle
+ne modifie pas le modele CP-SAT ni les parametres metier YAML.
 
 PowerShell : ne pas utiliser le backslash `\` comme continuation de ligne.
 
@@ -870,6 +884,8 @@ docs/09_modelisation_algorithmique_complete.tex
 docs/09_modelisation_algorithmique_complete.pdf
 docs/10_contexte_llm.md
 docs/11_surcouche_metier_post_optimisation.md
+docs/12_execution_guidee.md
+docs/rapport_technique_complet.tex
 ```
 
 Rôle :
@@ -879,6 +895,9 @@ Rôle :
   modèle et de l'algorithme. Si le PDF n'a pas été régénéré, les sources `.md`
   et `.tex` font foi.
 - `docs/11_surcouche_metier_post_optimisation.md` : doc humaine de la surcouche.
+- `docs/12_execution_guidee.md` : guide utilisateur de `guided-run`.
+- `docs/rapport_technique_complet.tex` : document LaTeX consolidé incluant
+  modélisation, exports, surcouche métier et annexe `travel_time_core`.
 - `docs/10_contexte_llm.md` : contexte technique pour IA.
 
 ## 17. Points de vigilance métier

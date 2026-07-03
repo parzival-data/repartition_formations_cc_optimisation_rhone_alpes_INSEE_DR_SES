@@ -14,4 +14,15 @@ Le flux complet est :
 8. exporter des résultats lisibles et reproductibles ;
 9. produire une carte HTML de visualisation.
 
-Le dépôt contient le solveur CP-SAT, les contrôles de validation, les exports et la cartographie HTML. La formulation détaillée est décrite dans [Modélisation algorithmique complète](09_modelisation_algorithmique_complete.md).
+Le dépôt contient le solveur CP-SAT, les contrôles de validation, les exports et la cartographie HTML. La formulation détaillée est décrite dans [Modélisation algorithmique complète](09_modelisation_algorithmique_complete.md). Le document LaTeX consolidé [rapport_technique_complet.tex](rapport_technique_complet.tex) regroupe aussi l'annexe de production des matrices de temps.
+
+## Execution guidee
+
+Pour un lancement accompagne, la commande suivante guide l'utilisateur dans les
+etapes du pipeline sans lancer les etapes longues sans confirmation :
+
+```powershell
+cc-formation-optimizer guided-run --config config/config_ear2027.yaml
+```
+
+Voir [Execution guidee](12_execution_guidee.md).

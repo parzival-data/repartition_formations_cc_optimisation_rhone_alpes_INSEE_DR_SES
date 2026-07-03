@@ -873,7 +873,79 @@ Les coordonnées n'interviennent pas dans le modèle CP-SAT. Elles servent
 uniquement à positionner les points sur la carte. Les communes sans coordonnées
 restent dans la solution et dans les exports.
 
-## 14. Performance et taille du modèle
+## 14. Surcouche métier `business_postprocess`
+
+La surcouche `business_postprocess` intervient après la résolution, la
+validation et l'export de la solution. Elle constitue une étape optionnelle de
+revue métier : elle relit les fichiers produits par l'optimisation, détecte des
+situations qui peuvent mériter un arbitrage humain, puis écrit des propositions
+dans un dossier séparé.
+
+Elle ne fait pas partie du modèle CP-SAT. Elle ne crée aucune variable de
+décision, ne modifie pas la fonction objectif, ne relance pas le solveur et ne
+réécrit jamais les exports d'origine. La solution optimisée reste donc la
+référence algorithmique ; les fichiers de post-traitement sont des aides à la
+revue métier.
+
+La commande associée est :
+
+```powershell
+cc-formation-optimizer postprocess-business-rules `
+  --config config/config_ear2027.yaml `
+  --input-dir outputs `
+  --output-dir outputs/postprocess `
+  --min-travel-time-gain-min 5
+```
+
+Le dossier `--input-dir` doit contenir les exports validés
+`solutions/sessions.csv` et `solutions/communes_affectees.csv`. La configuration
+est rechargée pour retrouver les temps de trajet, les compatibilités et les
+seuils utiles aux contrôles de faisabilité locale. Si `--output-dir` n'est pas
+fourni, les résultats sont écrits dans `postprocess/` sous la racine d'entrée.
+
+Deux fichiers CSV sont produits :
+
+| Fichier | Rôle |
+| --- | --- |
+| `business_reallocation_proposals.csv` | propositions détaillées de changement de pivot ou de rattachement |
+| `business_reallocation_summary.csv` | synthèse par règle métier, avec compteurs et gains cumulés |
+
+Le post-traitement applique actuellement trois règles :
+
+1. pour une session TPC dont le pivot n'est pas une commune affectée à la
+   session, proposer un pivot interne minimisant le temps de trajet total des
+   communes participantes ;
+2. lorsqu'une commune pivot ne participe pas à sa propre session, proposer son
+   rattachement à cette session ;
+3. lorsqu'une commune est plus proche d'un autre pivot ouvert de même type de
+   formation, proposer un rattachement alternatif si le gain atteint le seuil
+   `min_travel_time_gain_min`.
+
+Chaque proposition recalcule les charges CC, les temps de trajet avant/après,
+les gains potentiels et les alertes de compatibilité avec les contraintes
+vérifiables depuis les exports. La colonne `model_constraints_respected` indique
+si la proposition semble respecter ces contraintes locales. Une proposition non
+compatible peut tout de même être écrite, avec une explication dans `warning`,
+car l'objectif est de documenter les arbitrages possibles, pas de produire une
+nouvelle solution automatiquement applicable.
+
+Les propositions sont indépendantes. La surcouche ne résout pas les conflits
+entre règles et ne garantit pas qu'un ensemble de propositions forme une
+solution globalement faisable. La colonne `conflict_hint` signale les cas où une
+même commune ou une même session apparaît dans plusieurs propositions et doit
+être arbitrée manuellement.
+
+Le rôle de cette étape peut être résumé ainsi :
+
+$$
+\text{revue métier}
+=
+\text{exports optimisés validés}
++
+\text{propositions séparées de post-traitement}
+$$
+
+## 15. Performance et taille du modèle
 
 La taille du modèle depend surtout du nombre de variables d'affectation `x`.
 Ces variables sont creees pour les couples commune-pivot admissibles,
@@ -907,7 +979,7 @@ contraintes, puis avoir besoin de beaucoup plus de temps pour prouver qu'elle
 est optimale. Le parallelisme peut ameliorer la recherche, mais il ne change ni
 les contraintes ni la fonction objectif.
 
-## 15. Correspondance code / mathématiques
+## 16. Correspondance code / mathématiques
 
 | Element | Signification | Fichier |
 | --- | --- | --- |
@@ -925,8 +997,9 @@ les contraintes ni la fonction objectif.
 | assouplissement | scenarios hiérarchiques | `relaxation.py` |
 | exports | restitution | `export.py` |
 | carte | visualisation | `map_export.py` |
+| post-traitement métier | propositions hors solveur | `business_postprocess/` |
 
-## 16. Limites et points de vigilance
+## 17. Limites et points de vigilance
 
 Le modèle actuel est volontairement centre sur l'affectation des communes aux
 sessions. Les limites suivantes doivent être connues avant toute utilisation
@@ -941,6 +1014,8 @@ métier :
 - une commune pivot ouverte n'est pas forcement affectée à sa propre session ;
 - une session TPC peut avoir un pivot PC si le pivot n'est pas contraint à être
   membre de sa session ;
+- la surcouche `business_postprocess` produit des propositions indépendantes,
+  pas une nouvelle solution optimisée ;
 - les superviseurs, disponibilités et contraintes calendaires ne sont pas
   optimises si aucune variable ou contrainte dédiée ne les encode ;
 - une validation métier finale reste nécessaire après la validation
@@ -949,7 +1024,7 @@ métier :
 Ces limites ne sont pas des erreurs d'exécution. Elles delimitent le perimêtre
 exact du modèle implémenté et les points à discuter avant toute extension.
 
-## 17. Conclusion
+## 18. Conclusion
 
 L'outil produit une solution d'affectation en combinant une préparation de
 données, une formulation CP-SAT, une résolution paramétrée, une extraction

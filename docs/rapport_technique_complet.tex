@@ -1,0 +1,1115 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{lmodern}
+\usepackage{geometry}
+\usepackage{microtype}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{verbatim}
+\usepackage{url}
+
+\geometry{margin=2.5cm}
+\setlength{\parskip}{0.55em}
+\setlength{\parindent}{0pt}
+\setlist[itemize]{leftmargin=1.4em}
+\setlist[enumerate]{leftmargin=1.6em}
+\setlength{\emergencystretch}{3em}
+\setcounter{secnumdepth}{0}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\sloppy
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  urlcolor=blue,
+  pdftitle={Rapport technique complet - Optimisation des formations CC EAR 2027},
+  pdfauthor={Projet cc-formation-optimizer}
+}
+
+\title{\textbf{Rapport technique complet}\\
+\large Optimisation des formations de coordonnateurs communaux - EAR 2027}
+\author{Projet \texttt{cc-formation-optimizer}}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+\section{1. Abstract}
+
+Ce document décrit l'algorithme complet utilisé par l'outil d'optimisation des sessions de formation des coordonnateurs communaux des petites communes, notamment dans le cadre de l'Enquête Annuelle de Recensement 2027. 
+
+Ce document constitue la référence pour comprendre comment les objets du code, les notations mathématiques et les fichiers produits s'articulent dans l'implémentation actuelle.
+
+Ce projet ne remplace pas une vérification humaine mais cherche à simplifier une tâche complexe à réaliser manuellement.
+
+\section{2. Vue d'ensemble du pipeline}
+
+Le pipeline du projet suit une chaîne volontairement séparée en étapes. Chaque étape produit des objets ou fichiers réutilisables par l'étape suivante, ce qui rend le calcul plus contrôlable.
+
+\begin{verbatim}
+Données 
+-> paramètres dérivés
+-> diagnostic pré-résolution
+-> modèle CP-SAT
+-> résolution
+-> extraction de solution
+-> validation 
+-> surcouche (situations à arbitrer)
+-> exports
+
+\end{verbatim}
+
+
+L'extraction de solution est importante : le solveur manipule des variables CP-SAT, tandis que les exports manipulent une solution lisible reconstruite et validée à partir des données d'entrée et des variables CP-SAT. 
+
+\newpage
+\section{3. Données d'entrée et préparation}
+
+Le solveur ne lit pas directement les fichiers bruts. Les données réelles sont d'abord préparées par la commande \texttt{prepare-data}, qui transforme les fichiers sources en tables propres exploitées par les modules de chargement.
+
+Le fichier des communes fournit les \textbf{identifiants INSEE, les noms, la population, la catégorie PC ou TPC} et des champs optionnels comme le territoire EAR, le nombre de logements, \textbf{la latitude et la longitude}. Ces données permettent de calculer le nombre de coordonnateurs communaux à former et de connaître la catégorie métier de chaque commune.
+
+Le fichier des temps de trajet fournit des temps orientés entre une commune origine et une commune candidate pivot. Un trajet absent est traité comme interdit : il ne crée pas de variable d'affectation. La préparation ne complète pas automatiquement les trajets diagonaux \texttt{i -> i}; si un trajet diagonal doit être admissible avec un temps nul, il doit être présent dans les données propres.
+
+Les coordonnées sont optionnelles pour l'optimisation. Lorsqu'elles sont présentes, latitudes et longitudes sont jointes aux communes et servent à la carte HTML. Une commune sans coordonnées peut tout de même être affectée et apparaître dans les exports non cartographiques.
+
+Le fichier de compatibilités est également optionnel. S'il est absent, le code considère que toutes les compatibilités métier valent \texttt{1} par défaut. S'il est présent, il permet d'interdire certains couples commune-pivot avant même la création des variables d'affectation.
+
+Les principales sorties de préparation sont :
+
+\begin{itemize}
+\item \texttt{data/processed/communes\_clean.csv} ;
+\item \texttt{data/processed/temps\_trajet\_clean.csv} ;
+\item \texttt{data/processed/compatibilites\_clean.csv} si une source de compatibilités est
+disponible.
+
+\end{itemize}
+
+\newpage
+\section{4. Ensembles du modèle}
+
+On note d'abord l'ensemble des communes à affecter :
+
+\[\mathbf{C} = \text{\textbf{ensemble des communes à affecter}}\]
+
+Cet ensemble contient toutes les communes chargées depuis le fichier propre des communes.
+
+Les communes PC et TPC forment deux sous-ensembles de $C$ :
+
+\[
+ P = \text{ensemble des communes PC non TPC} \subset C
+\qquad
+T = \text{ensemble des communes TPC} \subset C
+\]
+
+Le code suppose que chaque commune appartient à une seule catégorie :
+
+\[
+C = P \cup T
+\qquad
+P \cap T = \varnothing
+\]
+
+Ici, $T$ désigne l'ensemble des communes TPC. Il ne faut pas le confondre avec le paramètre de temps maximal, également noté \texttt{T} dans la configuration. Le contexte indique toujours s'il s'agit d'un ensemble ou du seuil de trajet.
+
+Toutes les communes sont candidates pivot :
+
+\[
+\mathbf{F} = \text{\textbf{ensemble des communes candidates au rôle de pivot}} = C
+\]
+
+
+Cela signifie que le modèle autorise toute commune chargée à héberger une session potentielle, sous réserve des autres contraintes et pénalités. Cette égalité ne signifie pas qu'une commune pivot ouverte est automatiquement membre de sa propre session : le modèle actuel ne force pas cette auto-affectation.
+
+Les sessions candidates sont indexées par une commune pivot \texttt{j} et un rang de slot \texttt{m} :
+
+\[
+S = \{(j,m) : j \in F, m \in \{1,\dots,M_j\}\}
+\]
+
+Le nombre de slots dépend de la catégorie de la commune pivot :
+
+\[
+M_j =
+\begin{cases}
+3 & \text{si } j \in P,\\
+1 & \text{si } j \in T.
+\end{cases}
+\]
+
+Une commune PC peut donc porter jusqu'à trois sessions candidates, tandis qu'une commune TPC ne peut porter qu'une session candidate. Ces slots sont seulement des possibilités : une session candidate devient réelle uniquement si sa variable d'ouverture vaut \texttt{1}.
+
+\newpage
+\section{5. Paramètres métier}
+
+On note $p_i$ la population de la commune \texttt{i}. Le nombre de coordonnateurs communaux à former dépend de cette population :
+
+\[
+q_i =
+\begin{cases}
+1 & \text{si } p_i \leq 5000,\\
+2 & \text{si } p_i > 5000.
+\end{cases}
+\]
+
+Le temps de trajet de la commune \texttt{i} vers le pivot \texttt{j} est noté :
+
+\[
+\tau_{ij} \geq 0
+\]
+
+Les temps sont orientés : un trajet \texttt{i -> j} et un trajet \texttt{j -> i} sont deux entrées distinctes si les données les fournissent.
+
+Le seuil maximal de trajet configuré est noté $T$. Un couple commune-pivot est admissible seulement si le trajet existe et respecte ce seuil :
+
+\[
+a_{ij} =
+\begin{cases}
+1 & \text{si le trajet } i \to j \text{ existe et } \tau_{ij} \leq T,\\
+0 & \text{sinon.}
+\end{cases}
+\]
+
+Un trajet absent donne donc $a_{ij} = 0$. Il ne s'agit pas d'une forte pénalité : le couple est retiré du modèle d'affectation.
+
+La compatibilité métier externe est notée :
+
+\[
+b_{ij} \in \{0,1\}
+\]
+
+Si aucun fichier de compatibilité n'est fourni, l'implémentation pose :
+
+\[
+b_{ij}=1
+\qquad
+\forall i \in C,\ \forall j \in F
+\]
+
+Toutes les compatibilités sont alors autorisées par défaut. Si un fichier est fourni, une valeur \texttt{0} interdit le couple correspondant.
+
+Les autres paramètres métier structurants sont :
+
+\begin{longtable}{|L{0.28\textwidth}|L{0.62\textwidth}|}
+\hline
+Paramètre & Signification \\
+\hline
+\endhead
+$T$ & temps maximal admissible pour une affectation commune-pivot \\
+\hline
+$Q$ & capacité maximale d'une session, en nombre de CC \\
+\hline
+$L$ & remplissage minimal d'une session ouverte \\
+\hline
+$f$ & budget maximal de sessions PC \\
+\hline
+$k$ & budget maximal de sessions TPC \\
+\hline
+$B$ & budget total déclaré, avec $B = f + k$ \\
+\hline
+$w_t$ & poids du temps de trajet dans l'objectif \\
+\hline
+$w_e$ & poids des coûts d'éligibilité dans l'objectif \\
+\hline
+$w_m$ & poids de la mixité résiduelle dans l'objectif \\
+\hline
+$e_j^{PC}$ & coût d'éligibilité si le pivot $j$ héberge une session PC \\
+\hline
+$e_j^{TPC}$ & coût d'éligibilité si le pivot $j$ héberge une session TPC \\
+\hline
+\end{longtable}
+
+\newpage
+\section{6. Variables de décision}
+
+La variable d'affectation indique si une commune est rattachée à une session candidate :
+
+\[
+x_{ijm} \in \{0,1\}
+\]
+
+\[
+x_{ijm}=1
+\quad \Longleftrightarrow \quad
+\text{la commune } i \text{ est affectée à la session } (j,m).
+\]
+
+Cette variable n'existe pas pour tous les triplets possibles. Elle est créée uniquement pour les couples commune-pivot admissibles et compatibles.
+
+La variable d'ouverture indique si une session candidate est effectivement ouverte :
+
+\[
+y_{jm} \in \{0,1\}
+\]
+
+\[
+y_{jm}=1
+\quad \Longleftrightarrow \quad
+\text{la session } (j,m) \text{ est ouverte.}
+\]
+
+La variable de type distingue les sessions PC et TPC :
+
+\[
+z_{jm} \in \{0,1\}
+\]
+
+\[
+z_{jm}=1
+\quad \Longleftrightarrow \quad
+\text{la session } (j,m) \text{ est de type TPC.}
+\]
+
+Lorsque $z_{jm} = 0$ et que la session est ouverte, elle est interprétée comme une session PC.
+
+La variable de mixité résiduelle est entière :
+
+\[
+d_{jm} \in \mathbb{N}
+\]
+
+Elle mesure le nombre de CC TPC affectés à une session PC. Pour une session TPC, elle peut rester nulle, car la présence de communes TPC y est naturelle.
+
+La condition de création des variables d'affectation est :
+
+\[
+a_{ij}=1
+\quad \text{et} \quad
+b_{ij}=1.
+\]
+
+Cette restriction est décisive pour la taille du modèle : un couple interdit ne devient pas une variable pénalisée, il n'existe tout simplement pas dans le modèle CP-SAT.
+
+\newpage
+\section{7. Fonction objectif}
+
+Le modèle minimise une somme pondérée de trois composantes : le coût de trajet, le coût d'éligibilité des pivots et la mixité résiduelle.
+
+La composante de trajet est :
+
+\[
+O_{\text{trajet}}
+=
+\sum_{i \in C}
+\sum_{(j,m)\in S}
+q_i \tau_{ij} x_{ijm}
+\]
+
+Chaque temps de trajet est multiplié par le nombre de CC de la commune. Une commune de plus de 5000 habitants pèse donc deux fois plus qu'une commune à un seul CC.
+
+La composante d'éligibilité est :
+
+\[
+O_{\text{éligibilité}}
+=
+\sum_{(j,m)\in S}
+\left[
+e_j^{PC} y_{jm}
++
+\left(e_j^{TPC}-e_j^{PC}\right) z_{jm}
+\right]
+\]
+
+Si la session est ouverte et PC, alors \texttt{y\_jm = 1} et \texttt{z\_jm = 0}, donc le coût vaut \texttt{e\_j\textasciicircum{}\{PC\}}. Si elle est TPC, alors \texttt{z\_jm = 1}, et l'expression vaut \texttt{e\_j\textasciicircum{}\{TPC\}}. 
+
+La composante de mixité est :
+
+\[
+O_{\text{mixité}}
+=
+\sum_{(j,m)\in S}
+d_{jm}
+\]
+
+Elle pénalise la présence de CC TPC dans des sessions PC, sans l'interdire.
+
+L'objectif global est :
+
+\[\fbox{\textbf{
+\underset{\substack{
+x_{ijm} \in \{0,1\} \\
+y_{jm} \in \{0,1\} \\
+z_{jm} \in \{0,1\} \\
+d_{jm} \in \mathbb{N}
+}}{\min} \quad
+w_t O_{\text{trajet}}
++
+w_e O_{\text{éligibilité}}
++
+w_m O_{\text{mixité}}
+}}\]
+
+La formulation est linéaire. Le modèle reste donc compatible avec CP-SAT et ne contient pas de produit entre variables.
+
+\newpage
+\section{8. Contraintes}
+
+Les contraintes ci-dessous sont les contraintes dures du modèle. Une solution qui en viole une n'est pas faisable, quel que soit son coût objectif.
+
+\subsection{8.1 Affectation unique}
+
+Pour chaque commune, exactement une variable d'affectation doit être active :
+
+\[
+\sum_{(j,m)\in S_i} x_{ijm} = 1
+\qquad
+\forall i \in C
+\]
+
+$S_i$ désigne les sessions candidates pour lesquelles une variable $x_{ijm}$ existe pour la commune \texttt{i}. Cette contrainte garantit qu'aucune commune n'est oubliée et qu'aucune commune n'est affectée deux fois.
+
+\subsection{8.2 Pas d'affectation sans ouverture}
+
+Une commune ne peut être affectée qu'à une session ouverte :
+
+\[
+x_{ijm} \leq y_{jm}
+\qquad
+\forall x_{ijm}
+\]
+
+Si $y_{jm} = 0$, alors toutes les affectations vers cette session doivent valoir \texttt{0}.
+
+\subsection{8.3 Capacité et remplissage minimal}
+
+La charge d'une session ouverte doit rester entre $L$ et $Q$ :
+
+\[
+L y_{jm}
+\leq
+\sum_{i\in C} q_i x_{ijm}
+\leq
+Q y_{jm}
+\qquad
+\forall (j,m)\in S
+\]
+
+Si la session est fermée, $y_{jm} = 0$ et la charge imposée est nulle. Si elle est ouverte, elle doit respecter le remplissage minimal et la capacité maximale.
+
+\subsection{8.4 Cohérence entre type et ouverture}
+
+Une session fermée ne peut pas être déclarée TPC :
+
+\[
+z_{jm} \leq y_{jm}
+\qquad
+\forall (j,m)\in S
+\]
+
+Cette contrainte donne un sens à $z_{jm}$ uniquement lorsque la session existe.
+
+\subsection{8.5 Budget PC}
+
+Le nombre de sessions PC ouvertes ne doit pas dépasser $f$ :
+
+\[
+\sum_{(j,m)\in S} (y_{jm}-z_{jm}) \leq f
+\]
+
+Pour une session ouverte PC, $y_{jm} - z_{jm} = 1$. Pour une session TPC, cette quantité vaut $0$. La contrainte compte donc les sessions PC.
+
+\subsection{8.6 Budget TPC}
+
+Le nombre de sessions TPC ouvertes ne doit pas dépasser $k$ :
+
+\[
+\sum_{(j,m)\in S} z_{jm} \leq k
+\]
+
+Le budget total $B$ est valide en configuration par l'invariant $B = f + k$. Dans le modèle, les deux contraintes précédentes pilotent directement les budgets par type.
+
+\subsection{8.7 Ordre d'ouverture des slots}
+
+Pour les pivots PC, les slots doivent être ouverts dans l'ordre :
+
+\[
+y_{j,m+1} \leq y_{jm}
+\qquad
+\forall j \in P,\ \forall m \in \{1,\dots,M_j-1\}
+\]
+
+Cette contrainte réduit les symétries. Elle évite par exemple d'ouvrir le slot 2 d'un pivot PC alors que le slot 1 du même pivot est fermé. Elle ne s'applique pas aux pivots TPC, qui n'ont qu'un seul slot.
+
+\subsection{8.8 Interdiction des PC dans une formation TPC}
+
+Une commune PC ne peut pas être affectée à une session de type TPC :
+
+\[
+x_{ijm} \leq 1-z_{jm}
+\qquad
+\forall i \in P,\ \forall (j,m)\in S_i
+\]
+
+Si $z_{jm} = 1$, la session est TPC et toutes les affectations de communes PC vers cette session sont forcées à $0$. En revanche, une commune TPC peut être affectée à une session PC ; cette situation est autorisée mais pénalisée par la mixité.
+
+Point de vigilance : cette contrainte porte sur la catégorie des communes affectées, pas sur la catégorie du pivot. Dans le modèle actuel, une session TPC peut donc avoir une commune pivot PC si aucune autre contrainte ne l'interdit. Comme le pivot n'est pas automatiquement forcé à appartenir à sa propre session, cette situation n'implique pas qu'une commune PC soit affectée à une session TPC.
+
+\subsection{8.9 Définition de la mixité résiduelle}
+
+On note le nombre de CC TPC affectés à une session :
+
+\[
+n_{jm}^{T}
+=
+\sum_{i\in T} q_i x_{ijm}
+\]
+
+La variable $d_{jm}$ doit couvrir la part TPC présente dans une session PC :
+
+\[
+d_{jm} \geq n_{jm}^{T} - Qz_{jm}
+\]
+
+\[
+d_{jm} \geq 0
+\]
+
+Si la session est TPC, $z_{jm} = 1$ et $n_{jm}^{T} - Qz_{jm}$ est inférieur ou égal à zéro grâce à la capacité maximale. $d_{jm}$ peut donc rester nul. Si la session est PC, $z_{jm} = 0$ et $d_{jm}$ mesure le nombre de CC TPC placés dans une session PC.
+
+\newpage
+\section{Formulation complète du problème d'optimisation}
+
+On définit l'ensemble des triplets d'affectation admissibles par :
+
+\[
+\mathcal{A}
+=
+\left\{
+(i,j,m)
+|
+i \in C,\ j \in F,\ m \in \{1,\dots,M_j\},\ a_{ij}=1,\ b_{ij}=1
+\right\}.
+\]
+
+Le problème d'optimisation s'écrit alors :
+
+\[
+\boxed{
+\begin{aligned}
+\min_{\substack{
+x_{ijm},\, y_{jm},\, z_{jm},\, d_{jm}
+}}
+\quad
+&
+w_t
+\sum_{(i,j,m)\in \mathcal{A}}
+q_i \tau_{ij} x_{ijm}
+\\
+&+
+w_e
+\sum_{(j,m)\in S}
+\left[
+e_j^{PC} y_{jm}
++
+\left(e_j^{TPC}-e_j^{PC}\right) z_{jm}
+\right]
+\\
+&+
+w_m
+\sum_{(j,m)\in S}
+d_{jm}
+\\[0.4cm]
+\text{\textbf{s.c.}}
+\quad
+&
+\sum_{\substack{(j,m) :\\ (i,j,m)\in \mathcal{A}}}
+x_{ijm}
+=
+1
+\qquad
+\forall i \in C
+\\[0.3cm]
+&
+x_{ijm}
+\leq
+y_{jm}
+\qquad
+\forall (i,j,m)\in \mathcal{A}
+\\[0.3cm]
+&
+L y_{jm}
+\leq
+\sum_{\substack{i\in C :\\ (i,j,m)\in \mathcal{A}}}
+q_i x_{ijm}
+\leq
+Q y_{jm}
+\qquad
+\forall (j,m)\in S
+\\[0.3cm]
+&
+z_{jm}
+\leq
+y_{jm}
+\qquad
+\forall (j,m)\in S
+\\[0.3cm]
+&
+\sum_{(j,m)\in S}
+\left(y_{jm}-z_{jm}\right)
+\leq
+f
+\\[0.3cm]
+&
+\sum_{(j,m)\in S}
+z_{jm}
+\leq
+k
+\\[0.3cm]
+&
+y_{j,m+1}
+\leq
+y_{jm}
+\qquad
+\forall j \in P,\ \forall m \in \{1,\dots,M_j-1\}
+\\[0.3cm]
+&
+x_{ijm}
+\leq
+1-z_{jm}
+\qquad
+\forall (i,j,m)\in \mathcal{A}\text{ où }\ i \in P
+\\[0.3cm]
+&
+d_{jm}
+\geq
+\sum_{\substack{i\in T :\\ (i,j,m)\in \mathcal{A}}}
+q_i x_{ijm}
+-
+Q z_{jm}
+\qquad
+\forall (j,m)\in S
+\\[0.3cm]
+&
+x_{ijm}
+\in
+\{0,1\}
+\qquad
+\forall (i,j,m)\in \mathcal{A}
+\\[0.3cm]
+&
+y_{jm}
+\in
+\{0,1\}
+\qquad
+\forall (j,m)\in S
+\\[0.3cm]
+&
+z_{jm}
+\in
+\{0,1\}
+\qquad
+\forall (j,m)\in S
+\\[0.3cm]
+&
+d_{jm}
+\in
+\mathbb{N}
+\qquad
+\forall (j,m)\in S.
+\end{aligned}
+}
+\]
+
+\newpage
+\section{9. Fonctionnement interne de CP-SAT et justification du paramétrage}
+
+Cette partie décrit ce qui se passe entre la formulation mathématique précédente et la solution extraite par le code. \cite{ortools-cpsat,ortools-limits,krupke-cpsat-primer}
+
+\subsection{9.1 Nature du solveur CP-SAT}
+
+CP-SAT est le solveur de programmation par contraintes d'OR-Tools pour des modèles entiers. La documentation OR-Tools insiste sur un point structurant : les variables et les contraintes doivent être exprimées avec des entiers. Le modèle de ce projet respecte cette contrainte : les variables $x$, $y$ et $z$ sont booléennes, la variable $d$ est entière, les temps de trajet sont en minutes entières et les pénalités sont des constantes entières.
+
+Le solveur n'exécute pas une recherche gloutonne. Il reçoit un modèle global : toutes les contraintes d'affectation, de capacité, de budget, de type de session et de mixité sont présentes en même temps. CP-SAT cherche alors une affectation complète qui respecte toutes les contraintes dures, puis minimise l'objectif pondéré.
+
+Le caractère entier est important pour l'interprétation des poids. C'est une unité objective entière que le solveur compare exactement aux autres composantes. Le paramétrage doit donc être lu comme une hiérarchie numérique entre arbitrages métier.
+
+\subsection{9.2 Transformation interne du modèle}
+
+Le code construit un CpModel avec des variables et des contraintes linéaires. Avant la recherche principale, CP-SAT valide le modèle et applique une phase de présolve. Cette phase cherche à simplifier le problème sans changer l'ensemble des solutions valides : suppression de variables inutiles, resserrement de domaines, détection de contraintes redondantes, substitutions et propagation des implications déjà évidentes.
+
+Dans ce projet, plusieurs choix aident le présolve :
+
+\begin{itemize}
+\item les variables $x_{ijm}$ ne sont créées que pour les trajets admissibles et les
+compatibilités autorisées ;
+
+\item les couples sans trajet ou au-delà de $T$ sont absents du modèle, au lieu d'être
+présents avec une très forte pénalité ;
+
+\item la contrainte d'ordre $y_{j,m+1} \leq y_{jm}$ supprime une partie des symétries
+entre slots d'un même pivot PC ;
+
+\item les budgets séparés PC et TPC bornent directement le nombre de sessions que le
+solveur peut ouvrir.
+
+\end{itemize}
+
+Le présolve ne remplace pas la commande diagnostic. Il travaille sur le modèle formel transmis à CP-SAT. Les diagnostics du code restent utiles avant l'appel au solveur pour signaler des communes sans pivot admissible, une incohérence de budget ou un risque de capacité insuffisante. En revanche, la preuve finale de faisabilité ou d'infaisabilité appartient au solveur.
+
+\subsection{9.3 Propagation, conflits et Lazy Clause Generation}
+
+CP-SAT combine des techniques de programmation par contraintes, de satisfiabilité booléenne et d'optimisation entière. La logique centrale est proche de la Lazy Clause Generation : les propagateurs de contraintes réduisent les domaines possibles ; lorsqu'une contradiction est rencontrée, le solveur produit une clause expliquant le conflit ; cette clause est apprise pour éviter de refaire la même erreur plus tard dans la recherche.
+
+Dans ce modèle, une décision locale peut produire beaucoup d'implications. Par exemple, si une session $z_{jm}$ est déclarée TPC, toutes les variables $x_{ijm}$ des communes PC vers cette session doivent rester à $0$. Si une session est fermée, toutes les affectations vers elle sont impossibles. Si une session est presque pleine, les affectations restantes qui dépasseraient $Q$ deviennent impossibles.
+
+La propagation permet donc de couper des branches avant de tester une solution complète. L'apprentissage de clauses ajoute une mémoire de recherche : après un conflit, CP-SAT conserve une explication logique qui empêche de revenir vers une combinaison équivalente. C'est une des raisons pour lesquelles la formulation linéaire, entière et sans produit entre variables est préférable ici : elle donne au solveur des contraintes exploitables directement.
+
+\subsection{9.4 Recherche parallèle et amélioration des solutions}
+
+CP-SAT peut utiliser plusieurs travailleurs de recherche. Avec \texttt{num\_workers: 8}, la configuration autorise huit workers. Ils ne changent pas le modèle mathématique ; ils diversifient la recherche, les heuristiques et les preuves sur la même formulation. Ce choix est adapté à un problème d'affectation combinatoire où trouver une première solution et prouver sa qualité peuvent avoir des difficultés différentes.
+
+Le solveur travaille avec deux objectifs complémentaires :
+
+\begin{itemize}
+\item trouver rapidement une solution faisable respectant toutes les contraintes ;
+\item améliorer cette solution ou prouver qu'aucune solution de meilleur coût
+n'existe.
+
+\end{itemize}
+
+C'est pourquoi une solution FEASIBLE est exploitable mais pas optimale au sens mathématique. Elle respecte les contraintes, mais le solveur n'a pas démontré qu'elle est la meilleure possible dans le temps alloué. Une solution OPTIMAL ajoute cette preuve. Un statut INFEASIBLE signifie que CP-SAT a prouvé l'absence de solution sous les contraintes actuelles. Un statut UNKNOWN signifie que les limites de recherche ont été atteintes ou qu'aucune conclusion exploitable n'a été produite.
+
+\subsection{9.5 Paramètres solveur actuels}
+
+Les paramètres solveur de \textit{config\_ear2027.yaml} sont :
+
+\begin{longtable}{|L{0.24\textwidth}|L{0.18\textwidth}|L{0.48\textwidth}|}
+\hline
+Paramètre & Valeur actuelle & Justification \\
+\hline
+\endhead
+\texttt{time\_limit\_seconds} & 1200 & limite de 20 minutes, peut être augmentée à 40 minutes \\
+\hline
+\texttt{num\_workers} & 8 & exploite le parallélisme disponible pour diversifier la recherche CP-SAT sans modifier le modèle \\
+\hline
+\texttt{random\_seed} & 1 & stabilise les décisions pseudo-aléatoires pour rendre les comparaisons de runs plus reproductibles \\
+\hline
+\texttt{log\_search\_progress} & true & conserve une trace exploitable de la progression, utile pour distinguer absence de solution, manque de temps et lenteur de preuve \\
+\hline
+\end{longtable}
+
+La limite de temps est cohérente avec la documentation OR-Tools, qui recommande de borner la recherche pour garantir que le programme termine dans un délai raisonnable. Ici, 1200 secondes est un compromis opérationnel, il peut être augmenté si besoin. Au-dessus de 2400 secondes, le résultat proposé n'évoluera plus d'après les différents tests effectués.
+
+La graine \texttt{random\_seed: 1} ne rend pas tous les comportements parallèles strictement bit à bit identiques sur toutes les machines. Elle fixe toutefois la part pseudo-aléatoire contrôlable et permet de comparer plus proprement deux configurations proches. Les logs activés sont justifiés car le statut final seul ne suffit pas toujours à diagnostiquer un modèle combinatoire : l'évolution des bornes, des conflits et des solutions intermédiaires donne une information utile.
+
+\subsection{9.6 Paramètres métier dans \texttt{config\_ear2027.yaml}}
+
+Les paramètres métier actuellement utilisés sont :
+
+\begin{longtable}{|L{0.26\textwidth}|L{0.16\textwidth}|L{0.48\textwidth}|}
+\hline
+Paramètre & Valeur actuelle & Rôle dans le modèle \\
+\hline
+\endhead
+\texttt{T} & 60 & temps maximal admissible entre une commune et son pivot \\
+\hline
+\texttt{Q} & 14 & capacité maximale d'une session en nombre de CC \\
+\hline
+\texttt{L} & 6 & remplissage minimal d'une session ouverte \\
+\hline
+\texttt{B} & 55 & budget total déclaré de sessions \\
+\hline
+\texttt{f} & 50 & budget maximal de sessions PC \\
+\hline
+\texttt{k} & 5 & budget maximal de sessions TPC \\
+\hline
+\texttt{threshold\_population} & 5000 & seuil au-dessus duquel une commune compte pour deux CC \\
+\hline
+\texttt{below\_or\_equal} & 1 & nombre de CC pour une commune de population inférieure ou égale au seuil \\
+\hline
+\texttt{above} & 2 & nombre de CC pour une commune au-dessus du seuil \\
+\hline
+\texttt{M\_PC} & 3 & nombre maximal de slots candidats pour un pivot PC \\
+\hline
+\texttt{M\_TPC} & 1 & nombre maximal de slots candidats pour un pivot TPC \\
+\hline
+\end{longtable}
+
+\subsection{9.7 Coûts d'éligibilité actuels}
+
+Les coûts d'éligibilité configurés par bande de population sont :
+
+\begin{longtable}{|L{0.20\textwidth}|L{0.14\textwidth}|L{0.14\textwidth}|L{0.40\textwidth}|}
+\hline
+Population du pivot & \texttt{e\_PC} & \texttt{e\_TPC} & Interprétation \\
+\hline
+\endhead
+1501 et plus & 0 & 0 & pivot pleinement favorable \\
+\hline
+1000 à 1500 & 100 & 50 & pivot possible, légèrement pénalisé \\
+\hline
+500 à 999 & 500 & 150 & pivot possible mais nettement moins souhaitable \\
+\hline
+0 à 499 & 1000000000 & 500 & pivot PC pratiquement exclu par pénalité ; pivot TPC encore possible mais coûteux \\
+\hline
+\end{longtable}
+
+Ces coûts ne sont pas des contraintes dures. Ils entrent dans l'objectif via \texttt{w\_e}, donc ils orientent le solveur parmi les solutions faisables. La valeur 1000000000 joue le rôle d'une pénalité quasi interdite : elle n'empêche pas formellement une solution, mais elle la rend dominée, sauf absence d'alternative.
+
+Les coûts TPC sont plus faibles que les coûts PC dans les petites bandes. Cela traduit une tolérance plus grande pour des pivots TPC de taille modérée, alors que l'ouverture d'une session PC dans une très petite commune est très fortement découragée.
+
+\subsection{9.8 Justification des poids de l'objectif}
+
+Les poids actuels sont :
+
+\begin{longtable}{|L{0.24\textwidth}|L{0.18\textwidth}|L{0.48\textwidth}|}
+\hline
+Poids & Valeur actuelle & Composante \\
+\hline
+\endhead
+\texttt{w\_t} & 100 & temps de trajet pondéré par le nombre de CC \\
+\hline
+\texttt{w\_e} & 1000 & coûts d'éligibilité des pivots \\
+\hline
+\texttt{w\_m} & 20 & mixité résiduelle TPC dans les sessions PC \\
+\hline
+\end{longtable}
+
+Le poids \texttt{w\_t: 100} valorise fortement la réduction des temps de trajet tout en conservant une lecture simple : une minute supplémentaire pour une commune à un CC coûte 100 unités d'objectif ; pour une commune à deux CC, elle coûte 200.
+
+Le poids \texttt{w\_e: 1000} donne une priorité forte à l'éligibilité des pivots. Par exemple, utiliser un pivot PC de bande 1000-1500 ajoute 100 * 1000 = 100000 unités d'objectif ; utiliser un pivot PC de bande 500-999 ajoute 500 * 1000 = 500000. Avec \texttt{w\_t: 100}, ces ordres de grandeur dépassent encore plusieurs milliers de minutes-CC. Le modèle préfère donc normalement un pivot plus éligible, même si cela impose un trajet un peu plus long, tant que le seuil dur \texttt{T} reste respecté.
+
+Le poids \texttt{w\_m: 20} pénalise chaque CC TPC placé dans une session PC. Cette pénalité est volontairement plus faible que le poids de trajet courant : elle signale la mixité résiduelle sans l'emporter mécaniquement sur des gains de trajet importants. Elle reste aussi nettement inférieure aux pénalités d'éligibilité pondérées par \texttt{w\_e}, de sorte que la qualité des pivots demeure un arbitrage structurant.
+
+L'\textbf{ordre de priorité} induit par les poids actuels est donc :
+
+\begin{enumerate}
+\item respecter toutes les contraintes dures, sans exception ;
+\item éviter les pivots peu éligibles, surtout pour les sessions PC ;
+\item minimiser les temps de trajet ;
+\item limiter la mixité TPC résiduelle dans les sessions PC quand cet arbitrage ne dégrade pas excessivement les autres composantes.
+
+\end{enumerate}
+
+\subsection{9.9 Lecture opérationnelle des sorties CP-SAT}
+
+À la fin de la recherche, CP-SAT retourne un statut et des valeurs de variables. Les statuts utiles sont :
+
+\begin{longtable}{|L{0.28\textwidth}|L{0.62\textwidth}|}
+\hline
+Statut & Interprétation opérationnelle \\
+\hline
+\endhead
+OPTIMAL & une solution faisable est trouvée et sa qualité optimale est prouvée \\
+\hline
+FEASIBLE & une solution faisable est trouvée, sans preuve d'optimalité \\
+\hline
+INFEASIBLE & aucune solution ne respecte les contraintes actuelles \\
+\hline
+MODEL\_INVALID & le modèle transmis au solveur est invalide \\
+\hline
+UNKNOWN & le solveur s'arrête sans solution ni preuve suffisante, souvent à cause d'une limite \\
+\hline
+\end{longtable}
+
+Le code ne doit exploiter une solution que lorsque le statut est OPTIMAL ou FEASIBLE. Les valeurs CP-SAT sont ensuite reconstruites en objets métier : sessions ouvertes, communes affectées, charges, types de session, temps de trajet et décomposition de l'objectif. Cette extraction reste nécessaire, car le solveur ne retourne que des valeurs de variables.
+
+La validation post-solution reste une étape distincte. Elle recalcule les règles importantes à partir de la solution extraite : affectation unique, existence des sessions référencées, capacités, budgets, interdiction des PC en session TPC, temps de trajet, compatibilités, cohérence de la mixité et objectif recalculé. La condition opérationnelle reste donc :
+
+\[
+\text{solution exploitable}
+\Longleftrightarrow
+\text{statut CP-SAT exploitable}
++
+\text{solution extraite}
++
+\text{validation OK}
+\]
+
+Les exports ne sont produits qu'après cette validation.
+
+\section{10. Assouplissement hiérarchique}
+
+Le workflow \texttt{solve-relaxed} applique une hiérarchie de tentatives. Il commence toujours par la configuration initiale. Si aucune solution validée n'est obtenue, il crée des copies indépendantes de la configuration et modifie uniquement des paramètres explicitement autorisés par le protocole.
+
+Les niveaux implémentés sont :
+
+\begin{enumerate}
+\item configuration initiale ;
+\item ajustement du poids \texttt{w\_m} ;
+\item réduction des coûts d'éligibilité TPC ;
+\item augmentation du seuil de trajet \texttt{T} ;
+\item réduction du remplissage minimal \texttt{L} ;
+\item augmentation de la capacité \texttt{Q} ;
+\item augmentation cohérente de \texttt{f}, \texttt{k} et \texttt{B} ;
+\item remplacement final des coûts très élevés par une pénalité finie, si
+  \texttt{allow\_replace\_large\_costs} est activé.
+
+\end{enumerate}
+
+À chaque tentative, toute la chaîne est relancée : paramètres dérivés, modèle CP-SAT, solveur, extraction et validation. Le workflow s'arrête à la première solution validée et journalise les tentatives exécutées.
+
+\section{11. Exports et visualisation}
+
+Une solution validée peut être restituée sous plusieurs formes :
+
+\begin{longtable}{|L{0.34\textwidth}|L{0.56\textwidth}|}
+\hline
+Fichier & Rôle \\
+\hline
+\endhead
+\texttt{outputs/solutions/sessions.csv} & détail des sessions ouvertes, charges, types, alertes et indicateurs \\
+\hline
+\texttt{outputs/solutions/communes\_affectees.csv} & affectation de chaque commune à une session et à un pivot \\
+\hline
+\texttt{outputs/reports/rapport\_solution.md} & synthèse lisible de la solution et des contrôles \\
+\hline
+\texttt{outputs/reports/statistiques\_solution.json} & statistiques structurées pour analyse ou réutilisation \\
+\hline
+\texttt{outputs/reports/config\_utilisee.yaml} & copie de la configuration ayant produit la solution \\
+\hline
+\texttt{outputs/solutions/solution\_formations.xlsx} & classeur optionnel si \texttt{openpyxl} est disponible localement \\
+\hline
+\texttt{outputs/maps/solution\_map.html} & carte HTML autonome de contrôle visuel \\
+\hline
+\end{longtable}
+
+La carte est une visualisation de contrôle. Elle aide à inspecter les pivots, les affectations, les temps de trajet proches du seuil et les alertes, mais elle ne remplace pas les CSV, le rapport, le JSON de statistiques et la configuration utilisée.
+
+Les coordonnées n'interviennent pas dans le modèle CP-SAT. Elles servent uniquement à positionner les points sur la carte. Les communes sans coordonnées restent dans la solution et dans les exports.
+
+\section{12. Surcouche métier \texttt{business\_postprocess}}
+
+La surcouche \texttt{business\_postprocess} intervient après la résolution, la validation et l'export de la solution. Elle constitue une étape optionnelle de revue métier : elle relit les fichiers produits par l'optimisation, détecte des situations qui peuvent mériter un arbitrage humain, puis écrit des propositions dans un dossier séparé.
+
+Elle ne fait pas partie du modèle CP-SAT. Elle ne crée aucune variable de décision, ne modifie pas la fonction objectif, ne relance pas le solveur et ne réécrit jamais les exports d'origine. La solution optimisée reste donc la référence algorithmique ; les fichiers de post-traitement sont des aides à la décision.
+
+Deux fichiers CSV sont produits :
+
+\begin{longtable}{|L{0.45\textwidth}|L{0.55\textwidth}|}
+\hline
+Fichier & Rôle \\
+\hline
+\texttt{business\_reallocation\_proposals.csv} & propositions détaillées de changement de pivot ou de rattachement \\
+\hline
+\texttt{business\_reallocation\_summary.csv} & synthèse par règle métier, avec compteurs et gains cumulés \\
+\hline
+\end{longtable}
+
+Le post-traitement applique actuellement trois règles :
+
+\begin{enumerate}
+\item pour une session TPC dont le pivot n'est pas une commune affectée à la session, proposer un pivot interne minimisant le temps de trajet total des communes participantes ;
+\item lorsqu'une commune pivot ne participe pas à sa propre session, proposer son rattachement à cette session ;
+\item lorsqu'une commune est plus proche d'un autre pivot ouvert de même type de formation, proposer un rattachement alternatif si le gain atteint le seuil \texttt{min\_travel\_time\_gain\_min}.
+\end{enumerate}
+
+Chaque proposition recalcule les charges CC, les temps de trajet avant/après, les gains potentiels et les alertes de compatibilité avec les contraintes vérifiables depuis les exports. La colonne \texttt{model\_constraints\_respected} indique si la proposition semble respecter ces contraintes locales. Une proposition non compatible peut tout de même être écrite, avec une explication dans \texttt{warning}, car l'objectif est de documenter les arbitrages possibles, pas de produire une nouvelle solution automatiquement applicable.
+
+Les propositions sont indépendantes. La surcouche ne résout pas les conflits entre règles et ne garantit pas qu'un ensemble de propositions forme une solution globalement faisable. La colonne \texttt{conflict\_hint} signale les cas où une même commune ou une même session apparaît dans plusieurs propositions et doit être arbitrée manuellement.
+
+
+\section{13. Performance du modèle}
+
+La taille du modèle dépend surtout du nombre de variables d'affectation $x_{ijm}$. Ces variables sont créées pour les couples commune-pivot admissibles, compatibles, puis dupliquées sur les slots du pivot.
+
+\[
+\left|\mathcal{A}\right|
+=
+\sum_{i\in C}
+\sum_{j\in F}
+M_j
+\mathbf{1}_{a_{ij}=1}
+\mathbf{1}_{b_{ij}=1}
+\]
+
+Cette formule explique pourquoi le seuil de trajet \texttt{T} a un effet important. Augmenter \texttt{T} augmente souvent le nombre de couples admissibles et donc le nombre de variables. Le problème peut devenir plus facile à rendre faisable, mais plus difficile à optimiser. Réduire \texttt{T} a l'effet inverse : le modèle est plus petit, mais le risque d'infaisabilité augmente.
+
+Le nombre de pivots candidats et les valeurs $M_j$ jouent aussi un rôle direct. Comme \texttt{F = C}, chaque commune est candidate pivot. Les communes PC génèrent jusqu'à trois slots, alors que les communes TPC n'en génèrent qu'un.
+
+\addcontentsline{toc}{section}{Bibliographie}
+\begin{thebibliography}{9}
+
+\bibitem{ortools-cpsat}
+Google OR-Tools, \emph{CP-SAT Solver}.
+\url{https://developers.google.com/optimization/cp/cp_solver}
+
+\bibitem{ortools-limits}
+Google OR-Tools, \emph{Setting solver limits}.
+\url{https://developers.google.com/optimization/cp/cp_tasks}
+
+\bibitem{krupke-cpsat-primer}
+Daniel Krupke, \emph{The CP-SAT Primer}, chapitre \emph{Under the hood}.
+\url{https://d-krupke.github.io/cpsat-primer/under_the_hood.html}
+
+\end{thebibliography}
+
+\newpage
+\section{Annexe - Produire une matrice de temps}
+
+Le modèle CP-SAT ne calcule pas les temps de trajet. Il
+les utilise comme une donnée d'entrée.
+Ce fichier doit contenir des trajets orientés sous la forme :
+
+\begin{verbatim}
+code_commune_origine,code_commune_pivot,temps_minutes
+\end{verbatim}
+
+La qualité de cette matrice a un effet direct sur l'optimisation. Lors de la
+construction des paramètres dérivés, un couple commune--pivot \texttt{(i, j)}
+est admissible seulement si un temps \texttt{tau\_ij} existe et si ce temps est
+inférieur ou égal au seuil \texttt{T}. Un trajet absent est donc interprété
+comme une liaison interdite : aucune variable d'affectation \texttt{x[i,j,m]}
+n'est créée pour ce couple.
+
+L'enjeu d'une matrice relativement complète n'est donc pas uniquement
+cartographique ou descriptif. Une matrice trop pauvre réduit l'espace de
+recherche du solveur, peut rendre certaines communes difficiles à affecter et
+peut conduire à une solution moins pertinente, voire infaisable, alors que des
+rattachements acceptables auraient existé si les temps avaient été
+calculés.
+
+\subsection{Rôle de \texttt{travel\_time\_core}}
+
+Le dossier \texttt{travel\_time\_core/} fournit une brique autonome pour produire
+ces temps de trajet.
+
+Le pipeline applique la chaîne
+suivante :
+
+\begin{enumerate}
+\item importer les communes source depuis le CSV ou l'ODS ;
+\item stocker les communes dans \texttt{travel\_times.sqlite} ;
+\item construire des couples origine--pivot candidats à partir des coordonnées ;
+\item calculer les temps pour ces couples, en mode \texttt{offline} ou en mode \texttt{ign} ;
+\item exporter les matrices de contrôle et le CSV compatible avec l'optimiseur.
+\end{enumerate}
+
+\subsection{Stratégie recommandée pour une matrice exploitable}
+
+La génération actuelle ne construit pas automatiquement une matrice complète
+\texttt{N x N}. Elle construit d'abord, pour chaque commune origine, les
+\texttt{k} destinations les plus proches à vol d'oiseau. Les paramètres sont :
+
+\begin{verbatim}
+candidates:
+  k_default: 150
+  k_pc: 120
+  k_tpc: 100
+\end{verbatim}
+
+Le code borne automatiquement \texttt{k} par \texttt{N - 1}, car une commune
+n'est pas candidate vers elle-même dans \texttt{build\_candidate\_routes}. Pour
+obtenir une matrice très couvrante, la solution la plus simple consiste donc à
+augmenter \texttt{k\_default}, \texttt{k\_pc} et \texttt{k\_tpc} jusqu'à couvrir
+presque toutes les autres communes. En pratique :
+
+\begin{enumerate}
+\item compter le nombre de communes \texttt{N} dans le fichier d'entrée ;
+\item fixer les trois valeurs \texttt{k} à une valeur au moins égale à
+  \texttt{N - 1}, ou à une valeur volontairement proche si l'on veut limiter le
+  volume ;
+\item lancer le pipeline en mode \texttt{offline} pour valider les volumes et le
+  format des sorties ;
+\item si les temps routiers réels sont nécessaires, relancer ensuite en mode
+  \texttt{ign}, en conservant le cache SQLite pour pouvoir reprendre le calcul ;
+\item exporter \texttt{temps\_trajet\_clean.csv}, puis le copier vers \texttt{data/processed/temps\_trajet\_clean.csv}.
+\end{enumerate}
+
+Cette approche produit une matrice relativement complète pour les couples
+inter-communes. Elle ne produit toutefois pas les diagonales
+\texttt{i -> i}. Si le modèle doit pouvoir affecter une commune à une session
+dont elle est elle-même le pivot avec un temps nul, il faut s'assurer que les
+lignes diagonales existent dans le CSV final :
+
+\begin{verbatim}
+code_commune_origine,code_commune_pivot,temps_minutes
+74001,74001,0
+74002,74002,0
+...
+\end{verbatim}
+
+Cette vérification est importante, car le chargeur principal ne génère pas les
+diagonales manquantes. Un trajet diagonal absent reste donc absent de
+\texttt{tau\_ij} et ne crée pas de variable d'affectation.
+
+\subsection{Contrôle de couverture avant utilisation}
+
+Avant de remplacer \texttt{data/processed/temps\_trajet\_clean.csv}, il faut
+contrôler la couverture obtenue. Le rapport
+\texttt{generation\_report.json} contient notamment :
+
+\begin{itemize}
+\item \texttt{communes} : nombre de communes importées ;
+\item \texttt{candidate\_pairs} : nombre de couples candidats construits ;
+\item \texttt{travel\_times\_total} : nombre de trajets stockés dans le cache ;
+\item \texttt{travel\_times\_ok} : nombre de trajets exploitables ;
+\item \texttt{travel\_times\_error} : nombre de trajets en erreur ;
+\item \texttt{thresholds\_minutes} : seuils utilisés pour les matrices filtrées.
+\end{itemize}
+
+Les exports de contrôle utiles sont :
+
+\begin{longtable}{|L{0.55\textwidth}|L{0.45\textwidth}|}
+\hline
+Fichier & Utilisation \\
+\hline
+\endhead
+\texttt{travel\_times\_sparse.csv} & vérifier les trajets calculés, les statuts, les durées et les erreurs \\
+\hline
+\texttt{travel\_times\_matrix\_minutes.csv} & inspecter la matrice large non filtrée \\
+\hline
+\texttt{travel\_times\_matrix\_minutes\_max\_60min.csv} & voir les trajets compatibles avec le seuil courant \texttt{T=60} \\
+\hline
+\texttt{travel\_times\_matrix\_minutes\_max\_75min.csv} & contrôler un seuil intermédiaire configuré dans \texttt{travel\_time\_core} \\
+\hline
+\texttt{travel\_times\_matrix\_minutes\_max\_90min.csv} & comparer avec la source brute ou un seuil de diagnostic plus large \\
+\hline
+\texttt{travel\_times\_matrix\_minutes\_max\_120min.csv} & inspecter la couverture large lorsque ce seuil est configuré \\
+\hline
+\texttt{temps\_trajet\_clean.csv} & fichier à transmettre au projet principal \\
+\hline
+\end{longtable}
+
+Un contrôle simple consiste à comparer le nombre de trajets attendus au nombre
+de trajets \texttt{ok}. Pour \texttt{N} communes, une matrice orientée complète
+hors diagonale contient \texttt{N * (N - 1)} trajets. Avec les diagonales, elle
+contient \texttt{N * N} lignes. Si les valeurs \texttt{k} sont inférieures à
+\texttt{N - 1}, le volume attendu devient approximativement \texttt{N * k}.
+
+\subsection{Effet sur le modèle d'optimisation}
+
+Une fois le CSV copié ou préparé dans
+\texttt{data/processed/temps\_trajet\_clean.csv}, le reste du projet l'utilise
+de manière déterministe. Le module \texttt{data\_loading.py} charge les temps
+orientés, \texttt{parameters.py} construit \texttt{tau\_ij} puis
+\texttt{a\_ij}, et \texttt{model\_builder.py} crée les variables
+\texttt{x[i,j,m]} uniquement pour les couples admissibles et compatibles.
+
+Une matrice plus complète augmente donc le nombre de rattachements possibles
+avant filtrage par le seuil \texttt{T}. Cela ne change pas les contraintes du
+modèle, mais améliore la qualité de la donnée d'entrée sur laquelle le solveur
+arbitre. Les trajets supérieurs à \texttt{T} peuvent rester dans le CSV : ils
+sont chargés dans \texttt{tau\_ij}, mais ils ne deviennent pas admissibles dans
+le modèle courant.
+
+\subsection{Points de vigilance}
+
+\begin{itemize}
+\item Le mode \texttt{offline} fournit une estimation déterministe ; il ne doit
+  pas être confondu avec un temps routier certifié.
+\item Le mode \texttt{ign} produit une donnée plus proche du routage réel, mais
+  dépend d'un service externe.
+\item Les diagonales nulles doivent être contrôlées explicitement si elles sont
+  attendues par le scénario métier. La commande \texttt{guided-run} effectue ce
+  contrôle sur le CSV préparé, ajoute les diagonales manquantes à \texttt{0} et
+  écrit \texttt{outputs/reports/rapport\_diagonale\_temps\_trajet.json}.
+\item Le fichier compatible issu de \texttt{travel\_time\_core} n'est pas copié
+  automatiquement vers \texttt{data/processed} hors confirmation explicite dans
+  l'exécution guidée.
+\end{itemize}
+
+
+\end{document}

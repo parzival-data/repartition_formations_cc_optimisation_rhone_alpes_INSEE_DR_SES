@@ -781,7 +781,60 @@ La carte est une visualisation de contrôle. Elle aide à inspecter les pivots, 
 
 Les coordonnées n'interviennent pas dans le modèle CP-SAT. Elles servent uniquement à positionner les points sur la carte. Les communes sans coordonnées restent dans la solution et dans les exports.
 
-\section{14. Performance et taille du modèle}
+\section{14. Surcouche métier \texttt{business\_postprocess}}
+
+La surcouche \texttt{business\_postprocess} intervient après la résolution, la validation et l'export de la solution. Elle constitue une étape optionnelle de revue métier : elle relit les fichiers produits par l'optimisation, détecte des situations qui peuvent mériter un arbitrage humain, puis écrit des propositions dans un dossier séparé.
+
+Elle ne fait pas partie du modèle CP-SAT. Elle ne crée aucune variable de décision, ne modifie pas la fonction objectif, ne relance pas le solveur et ne réécrit jamais les exports d'origine. La solution optimisée reste donc la référence algorithmique ; les fichiers de post-traitement sont des aides à la revue métier.
+
+La commande associée est :
+
+\begin{verbatim}
+cc-formation-optimizer postprocess-business-rules `
+  --config config/config_ear2027.yaml `
+  --input-dir outputs `
+  --output-dir outputs/postprocess `
+  --min-travel-time-gain-min 5
+\end{verbatim}
+
+Le dossier \texttt{--input-dir} doit contenir les exports validés \url{solutions/sessions.csv} et \url{solutions/communes_affectees.csv}. La configuration est rechargée pour retrouver les temps de trajet, les compatibilités et les seuils utiles aux contrôles de faisabilité locale. Si \texttt{--output-dir} n'est pas fourni, les résultats sont écrits dans \url{postprocess/} sous la racine d'entrée.
+
+Deux fichiers CSV sont produits :
+
+\begin{longtable}{|L{0.40\textwidth}|L{0.50\textwidth}|}
+\hline
+Fichier & Rôle \\
+\hline
+\endhead
+\texttt{business\_reallocation\_}\newline\texttt{proposals.csv} & propositions détaillées de changement de pivot ou de rattachement \\
+\hline
+\texttt{business\_reallocation\_}\newline\texttt{summary.csv} & synthèse par règle métier, avec compteurs et gains cumulés \\
+\hline
+\end{longtable}
+
+Le post-traitement applique actuellement trois règles :
+
+\begin{enumerate}
+\item pour une session TPC dont le pivot n'est pas une commune affectée à la session, proposer un pivot interne minimisant le temps de trajet total des communes participantes ;
+\item lorsqu'une commune pivot ne participe pas à sa propre session, proposer son rattachement à cette session ;
+\item lorsqu'une commune est plus proche d'un autre pivot ouvert de même type de formation, proposer un rattachement alternatif si le gain atteint le seuil \texttt{min\_travel\_time\_gain\_min}.
+\end{enumerate}
+
+Chaque proposition recalcule les charges CC, les temps de trajet avant/après, les gains potentiels et les alertes de compatibilité avec les contraintes vérifiables depuis les exports. La colonne \texttt{model\_constraints\_respected} indique si la proposition semble respecter ces contraintes locales. Une proposition non compatible peut tout de même être écrite, avec une explication dans \texttt{warning}, car l'objectif est de documenter les arbitrages possibles, pas de produire une nouvelle solution automatiquement applicable.
+
+Les propositions sont indépendantes. La surcouche ne résout pas les conflits entre règles et ne garantit pas qu'un ensemble de propositions forme une solution globalement faisable. La colonne \texttt{conflict\_hint} signale les cas où une même commune ou une même session apparaît dans plusieurs propositions et doit être arbitrée manuellement.
+
+Le rôle de cette étape peut être résumé ainsi :
+
+\[
+\text{revue métier}
+=
+\text{exports optimisés validés}
++
+\text{propositions séparées de post-traitement}
+\]
+
+\section{15. Performance et taille du modèle}
 
 La taille du modèle depend surtout du nombre de variables d'affectation \texttt{x}. Ces variables sont creees pour les couples commune-pivot admissibles, compatibles, puis dupliquees sur les slots du pivot.
 
@@ -801,7 +854,7 @@ Le nombre de pivots candidats et les valeurs \texttt{M\_j} jouent aussi un rôle
 
 Il faut enfin distinguer trouver une solution faisable et prouver son optimalité. CP-SAT peut trouver rapidement une solution respectant les contraintes, puis avoir besoin de beaucoup plus de temps pour prouver qu'elle est optimale. Le parallelisme peut ameliorer la recherche, mais il ne change ni les contraintes ni la fonction objectif.
 
-\section{15. Correspondance code / mathématiques}
+\section{16. Correspondance code / mathématiques}
 
 \begin{longtable}{|L{0.24\textwidth}|L{0.18\textwidth}|L{0.48\textwidth}|}
 \hline
@@ -836,9 +889,11 @@ exports & restitution & \texttt{export.py} \\
 \hline
 carte & visualisation & \texttt{map\_export.py} \\
 \hline
+post-traitement métier & propositions hors solveur & \texttt{business\_postprocess/} \\
+\hline
 \end{longtable}
 
-\section{16. Limites et points de vigilance}
+\section{17. Limites et points de vigilance}
 
 Le modèle actuel est volontairement centre sur l'affectation des communes aux sessions. Les limites suivantes doivent être connues avant toute utilisation métier :
 
@@ -853,6 +908,9 @@ Le modèle actuel est volontairement centre sur l'affectation des communes aux s
 \item une session TPC peut avoir un pivot PC si le pivot n'est pas contraint à être
 membre de sa session ;
 
+\item la surcouche \texttt{business\_postprocess} produit des propositions indépendantes,
+pas une nouvelle solution optimisée ;
+
 \item les superviseurs, disponibilités et contraintes calendaires ne sont pas
 optimises si aucune variable ou contrainte dédiée ne les encode ;
 
@@ -863,7 +921,7 @@ algorithmique.
 
 Ces limites ne sont pas des erreurs d'exécution. Elles delimitent le perimêtre exact du modèle implémenté et les points à discuter avant toute extension.
 
-\section{17. Conclusion}
+\section{18. Conclusion}
 
 L'outil produit une solution d'affectation en combinant une préparation de données, une formulation CP-SAT, une résolution paramétrée, une extraction métier et une validation indépendante. Cette chaîne permet d'obtenir des exports contrôles et une carte de visualisation sans confondre optimisation, validation et expertise métier.
 
