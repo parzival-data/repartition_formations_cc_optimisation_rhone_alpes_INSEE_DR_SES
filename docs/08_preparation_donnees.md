@@ -42,15 +42,15 @@ colonnes brutes et les sorties :
 - `travel_times.file` et `travel_times.sheet` selectionnent la matrice de temps.
 - `coordinates.file` et `coordinates.sheet` selectionnent le fichier de coordonnées.
 - `coordinates.columns` mappe le code commune, la latitude, la longitude et le nom informatif.
-- `compatibilities.file` peut être renseigne si un fichier de compatibilités est ajoute.
+- `compatibilities.file` peut être renseigné si un fichier de compatibilités est ajouté.
 
 Les noms de colonnes brutes peuvent changer tant que le mapping YAML est mis à
-jour et que les transformations restent documentees.
+jour et que les transformations restent documentées.
 
-Si `coordinates.file` n'est pas renseigne, le workflow cherche d'abord
+Si `coordinates.file` n'est pas renseigné, le workflow cherche d'abord
 `cities_geocoded.ods`, puis les fichiers dont le nom contient `geocod` ou
 `coord`. Cette détection automatique est une aide ; le YAML reste la source de
-vérité recommandée pour un jeu de données reel.
+vérité recommandée pour un jeu de données réel.
 
 ## Coordonnées
 
@@ -70,11 +70,11 @@ normalisé. Les contrôles appliques sont :
 - latitude et longitude numériques ;
 - latitude comprise entre `-90` et `90` ;
 - longitude comprise entre `-180` et `180` ;
-- signalement des coordonnées hors perimêtre EAR2027.
+- signalement des coordonnées hors périmètre EAR2027.
 
 Le fichier source ne déclaré pas explicitement de système de coordonnées. Les
 colonnes `lat`/`lon` sont conservées sans conversion. Une conversion ne doit
-être ajoutee que si le système source est documente.
+être ajoutée que si le système source est documenté.
 
 ## Sorties
 
@@ -87,9 +87,9 @@ La préparation produit :
 - `outputs/reports/statistiques_preparation_donnees.json` avec `--report`.
 
 Le rapport indique les fichiers lus, les colonnes renommées, les colonnes
-ignorées, les volumes, les anomalies et les transformations realisees. Il
+ignorées, les volumes, les anomalies et les transformations réalisées. Il
 inclut aussi le fichier de coordonnées utilisé, les colonnes de jointure, le
-nombre de coordonnées lues, valides, invalides, hors perimêtre et les communes
+nombre de coordonnées lues, valides, invalides, hors périmètre et les communes
 encore sans coordonnées.
 
 ## Contrôles
@@ -113,7 +113,7 @@ Anomalies non bloquantes :
 
 - colonnes latitude/longitude absentes ;
 - communes sans coordonnées ;
-- coordonnées hors perimêtre EAR2027 ;
+- coordonnées hors périmètre EAR2027 ;
 - fichier de compatibilités absent ;
 - matrice de trajets asymétrique ;
 - trajets absents.

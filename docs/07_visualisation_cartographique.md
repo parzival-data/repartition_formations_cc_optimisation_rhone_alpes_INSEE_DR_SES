@@ -53,7 +53,7 @@ La taille du symbole indique le rôle cartographique :
 
 La couleur du point correspond à la session ou au groupe de formation. Comme
 la palette est générée automatiquement, deux sessions peuvent avoir des
-couleurs proches lorsque beaucoup de sessions sont affichees.
+couleurs proches lorsque beaucoup de sessions sont affichées.
 
 Le contour indique le niveau d'alerte :
 
@@ -64,7 +64,7 @@ Le contour indique le niveau d'alerte :
   si ce niveau est présent dans les données embarquées.
 
 Les lignes commune -> pivot sont facultatives. Elles sont masquees par défaut
-et peuvent être affichees avec le filtre "Afficher les liaisons commune ->
+et peuvent être affichées avec le filtre "Afficher les liaisons commune ->
 pivot". Lorsque le filtre "Afficher les pivots seulement" est actif, les
 liaisons sont masquees pour garder une lecture claire.
 
@@ -83,13 +83,13 @@ Aucune bibliotheque JavaScript externe n'est requise. Le rendu des points est fa
 
 La carte dépend des champs optionnels `latitude` et `longitude` dans les données communes. Si une commune n'a pas de coordonnées :
 
-- elle n'est pas affichee sur la carte ;
-- elle est listee dans le panneau "communes sans coordonnées" ;
-- le compteur `communes_sans_coordonnees` est renseigne dans `globalStats`.
+- elle n'est pas affichée sur la carte ;
+- elle est listée dans le panneau "communes sans coordonnées" ;
+- le compteur `communes_sans_coordonnees` est renseigné dans `globalStats`.
 
 Si aucune commune n'a de coordonnées, le HTML est tout de même produit avec un message clair et les contrôles métier restent consultables.
 
-Les coordonnées sont ajoutees pendant la préparation des données, par jointure
+Les coordonnées sont ajoutées pendant la préparation des données, par jointure
 entre les communes et le fichier configuré dans `data_preparation.coordinates`
 du YAML. Le fichier actuel est `cities_geocoded.ods` avec les colonnes
 `insee_code`, `lat` et `lon`. Elles ne changent pas le modèle d'optimisation :
@@ -128,10 +128,10 @@ Si la carte semble vide :
 
 - vérifier que `points_avec_coordonnees` est non nul dans le panneau debug ;
 - vérifier que `const points` contient des nombres JSON pour `lat` et `lon`, pas des chaînes ;
-- régénérer uniquement la carte avec `render-map` pour eviter une nouvelle résolution longue.
+- régénérer uniquement la carte avec `render-map` pour éviter une nouvelle résolution longue.
 
 ## Limites
 
 - La carte est un export de contrôle, pas une source de vérité.
-- Les alertes affichees sont non bloquantes.
+- Les alertes affichées sont non bloquantes.
 - Le fond de carte depend d'un accès réseau àu service WMTS externe.

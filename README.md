@@ -47,7 +47,7 @@ les contraintes du modèle tout en restant compréhensible :
 
 Le pipeline principal suit ces étapes :
 
-1. préparation des données brutes ou chargément de CSV propres ;
+1. préparation des données brutes ou chargement de CSV propres ;
 2. diagnostic pré-résolution ;
 3. construction des paramètres dérivés ;
 4. construction du modèle CP-SAT ;
@@ -114,25 +114,25 @@ Pour le détail des champs et des invariants, voir
 
 ## Commandes principales
 
-### Lancer l'execution guidee
+### Lancer l'exécution guidée
 
 ```powershell
 cc-formation-optimizer guided-run --config config/config_ear2027.yaml
 ```
 
-Guide un utilisateur non expert et enchaine les controles utiles : fichiers
-bruts, preparation, controle des diagonales de temps de trajet, diagnostic,
-optimisation, exports, carte et surcouche metier. Les etapes longues comme le
+Guide un utilisateur non expert et enchaîne les contrôles utiles : fichiers
+bruts, préparation, contrôle des diagonales de temps de trajet, diagnostic,
+optimisation, exports, carte et surcouche métier. Les étapes longues comme le
 calcul des temps de trajet et le solveur demandent toujours confirmation.
 
 Options utiles :
 
-- `--yes` : confirme automatiquement les etapes courtes ;
+- `--yes` : confirme automatiquement les étapes courtes ;
 - `--skip-travel-times` : ne lance pas `travel_time_core` ;
 - `--skip-solve` : ne lance pas le solveur ;
-- `--skip-map` : ne regenere pas la carte seule ;
-- `--skip-postprocess` : ne lance pas la surcouche metier ;
-- `--input-dir`, `--processed-dir`, `--output-dir` : remplacent les dossiers par defaut.
+- `--skip-map` : ne régénère pas la carte seule ;
+- `--skip-postprocess` : ne lance pas la surcouche métier ;
+- `--input-dir`, `--processed-dir`, `--output-dir` : remplacent les dossiers par défaut.
 
 Voir [`docs/12_execution_guidee.md`](docs/12_execution_guidee.md).
 
@@ -313,13 +313,13 @@ Voir [`docs/11_surcouche_metier_post_optimisation.md`](docs/11_surcouche_metier_
 - `src/cc_formation_optimizer/` : package Python principal.
 - `src/cc_formation_optimizer/business_postprocess/` : surcouche métier
   post-optimisation.
-- `travel_time_core/` : sous-projet independant de generation des matrices de
+- `travel_time_core/` : sous-projet indépendant de génération des matrices de
   temps ; il communique avec l'optimiseur uniquement par fichiers CSV/ODS.
 - `tests/` : tests automatisés et fixtures.
 
-## Generation des matrices de temps
+## Génération des matrices de temps
 
-Le dossier `travel_time_core/` contient un sous-projet independant permettant de
+Le dossier `travel_time_core/` contient un sous-projet indépendant permettant de
 produire les matrices de temps de trajet. Il peut exporter un
 `temps_trajet_clean.csv` compatible avec l'optimiseur, sans import Python direct
 entre les deux projets. Voir [`travel_time_core/README.md`](travel_time_core/README.md).

@@ -7,13 +7,13 @@ sessions de formation des coordonnateurs communaux PC/TPC pour l'EAR 2027. Il
 sert de référence pour comprendre le lien entre les données d'entrée, la
 construction du modèle CP-SAT, la résolution, la validation et les exports.
 
-Le texte décrit l'état reel du code. Une règle, une contrainte ou un workflow
+Le texte décrit l'état réel du code. Une règle, une contrainte ou un workflow
 n'est présente comme existant que s'il est effectivement implémenté. Les
-extensions non codees sont signalees comme limites ou perspectives.
+extensions non codées sont signalées comme limites ou perspectives.
 
-Trois niveaux doivent être distingues pendant toute la lecture :
+Trois niveaux doivent être distingués pendant toute la lecture :
 
-- les contraintes dures, qui definissent la faisabilité mathématique ;
+- les contraintes dures, qui définissent la faisabilité mathématique ;
 - les pénalités de l'objectif, qui orientent le choix entre solutions faisables ;
 - les contrôles de diagnostic, de validation, d'export et de carte, qui aident à
   qualifier une solution mais ne remplacent pas l'expertise métier.
@@ -69,24 +69,24 @@ source en tables propres exploitees par les modules de chargément.
 Le fichier des communes fournit les identifiants INSEE, les noms, la population,
 la catégorie `PC` ou `TPC`, et des champs optionnels comme le territoire EAR, le
 nombre de logements, la latitude et la longitude. Ces données permettent de
-calculér le nombre de coordonnateurs communaux à former et de connaître la
+calculer le nombre de coordonnateurs communaux à former et de connaître la
 catégorie métier de chaque commune.
 
-Le fichier des temps de trajet fournit des temps orientes entre une commune
+Le fichier des temps de trajet fournit des temps orientés entre une commune
 origine et une commune candidate pivot. Un trajet absent est traité comme
-interdit : il ne cree pas de variable d'affectation. La préparation ne complété
+interdit : il ne crée pas de variable d'affectation. La préparation ne complète
 pas automatiquement les trajets diagonaux `i -> i`; si un trajet diagonal doit
 être admissible avec un temps nul, il doit être présent dans les données propres.
 
 Le fichier de coordonnées est optionnel pour l'optimisation. Lorsqu'il est
 présent, ses latitudes et longitudes sont jointes aux communes et servent à la
 carte HTML. Une commune sans coordonnées peut tout de même être affectée et
-apparaitre dans les exports non cartographiques.
+apparaître dans les exports non cartographiques.
 
 Le fichier de compatibilités est également optionnel. S'il est absent, le code
-considere que toutes les compatibilités métier valent `1` par défaut. S'il est
+considère que toutes les compatibilités métier valent `1` par défaut. S'il est
 présent, il permet d'interdire certains couples commune-pivot avant même la
-creation des variables d'affectation.
+création des variables d'affectation.
 
 Les principales sorties de préparation sont :
 
@@ -183,7 +183,7 @@ $$
 \tau_{ij} \geq 0
 $$
 
-Les temps sont orientes : un trajet `i -> j` et un trajet `j -> i` sont deux
+Les temps sont orientés : un trajet `i -> j` et un trajet `j -> i` sont deux
 entrées distinctes si les données les fournissent.
 
 Le seuil maximal de trajet configuré est note `T`. Un couple commune-pivot est
@@ -293,7 +293,7 @@ $$
 Elle mesure le nombre de CC TPC affectés à une session PC. Pour une session TPC,
 elle peut rester nulle, car la présence de communes TPC y est naturelle.
 
-La condition de creation des variables d'affectation est :
+La condition de création des variables d'affectation est :
 
 $$
 a_{ij}=1
@@ -817,7 +817,7 @@ contrôle post-solution du code.
 
 Le workflow `solve-relaxed` applique une hiérarchie de tentatives. Il commence
 toujours par la configuration initiale. Si aucune solution validée n'est obtenue,
-il cree des copies indépendantes de la configuration et modifie uniquement des
+il crée des copies indépendantes de la configuration et modifie uniquement des
 paramètres explicitement autorisés par le protocole.
 
 Les niveaux implémentés sont :
@@ -843,14 +843,14 @@ code.
 
 ## 13. Exports et visualisation
 
-Une solution validée peut être restituee sous plusieurs formes :
+Une solution validée peut être restituée sous plusieurs formes :
 
 | Fichier | Rôle |
 | --- | --- |
-| `sessions.csv` | détail des sessions ouvertes, chargés, types, alertes et indicateurs |
+| `sessions.csv` | détail des sessions ouvertes, charges, types, alertes et indicateurs |
 | `communes_affectees.csv` | affectation de chaque commune à une session et à un pivot |
 | `rapport_solution.md` | synthèse lisible de la solution et des contrôles |
-| `statistiques_solution.json` | statistiques structurées pour analyse ou reutilisation |
+| `statistiques_solution.json` | statistiques structurées pour analyse ou réutilisation |
 | `config_utilisee.yaml` | copie de la configuration ayant produit la solution |
 | `solution_map.html` | carte HTML autonome de contrôle visuel |
 
@@ -1021,7 +1021,7 @@ métier :
 - une validation métier finale reste nécessaire après la validation
   algorithmique.
 
-Ces limites ne sont pas des erreurs d'exécution. Elles delimitent le perimêtre
+Ces limites ne sont pas des erreurs d'exécution. Elles délimitent le périmètre
 exact du modèle implémenté et les points à discuter avant toute extension.
 
 ## 18. Conclusion

@@ -10,7 +10,7 @@ Cette documentation reprend la formulation de référence.
 - `F = C` : toute commune est candidate pivot.
 - `S = {(j,m) : j in F, m in 1..M_j}` : slots de formation.
 
-Les slots sont definis par :
+Les slots sont définis par :
 
 - `M_j = 3` pour un pivot PC ;
 - `M_j = 1` pour un pivot TPC.
@@ -66,8 +66,8 @@ Les contraintes suivantes sont implémentées dans `model_builder.py` :
 9. définition de la mixité résiduelle ;
 10. domaines des variables.
 
-Les variables `x_ijm` ne sont creees que pour les couples `(i,j)` admissibles et compatibles. Un trajet absent de la matrice `tau` ne cree donc aucune variable d'affectation.
+Les variables `x_ijm` ne sont créées que pour les couples `(i,j)` admissibles et compatibles. Un trajet absent de la matrice `tau` ne crée donc aucune variable d'affectation.
 
 La formulation CP-SAT reste linéaire : le coût d'éligibilité utilise `e_j^PC * y_jm + (e_j^TPC - e_j^PC) * z_jm`, et le budget PC utilise `y_jm - z_jm`. Aucun produit entre variables n'est introduit.
 
-Après résolution, `solution_extractor.py` transforme les valeurs CP-SAT en sessions ouvertes et affectations de communes. `validation.py` recalculé ensuite les contraintes et les composantes d'objectif depuis cette solution métier avant toute exploitation.
+Après résolution, `solution_extractor.py` transforme les valeurs CP-SAT en sessions ouvertes et affectations de communes. `validation.py` recalcule ensuite les contraintes et les composantes d'objectif depuis cette solution métier avant toute exploitation.

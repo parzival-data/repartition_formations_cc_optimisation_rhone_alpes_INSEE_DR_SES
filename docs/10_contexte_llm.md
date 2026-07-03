@@ -12,7 +12,7 @@ Ce fichier doit être traité comme une spécification de contexte, pas comme un
 documentation utilisateur. Les informations ci-dessous sont alignees avec le
 dépôt au moment de la rédaction.
 
-Priorites pour toute IA qui reprend le projet :
+Priorités pour toute IA qui reprend le projet :
 
 1. Commencer par `git status --short`, `git log --oneline -15`, `pytest`, puis
    `pytest travel_time_core\tests` si le sous-projet de trajets est concerne.
@@ -29,9 +29,9 @@ Priorites pour toute IA qui reprend le projet :
    - carte ;
    - surcouche métier post-optimisation.
 7. Une proposition post-optimisation n'est jamais une modification automatique
-   de la solution optimisee.
+   de la solution optimisée.
 
-## 1. Identite du projet
+## 1. Identité du projet
 
 Nom Python : `cc-formation-optimizer`
 Package : `src/cc_formation_optimizer/`
@@ -47,7 +47,7 @@ But métier : organiser des sessions de formation de coordonnateurs communaux
 Le projet a deux blocs fonctionnels :
 
 1. Optimisation sous contraintes :
-   - prépare ou chargé les données ;
+   - prépare ou charge les données ;
    - construit un modèle OR-Tools CP-SAT ;
    - affecte les communes à des sessions ;
    - choisit les sessions ouvertes et leurs pivots ;
@@ -411,15 +411,15 @@ cc-formation-optimizer render-map --config config/config_ear2027.yaml --solution
 cc-formation-optimizer postprocess-business-rules --config config/config_ear2027.yaml --input-dir outputs --output-dir outputs/postprocess --min-travel-time-gain-min 5
 ```
 
-Commande guidee pour utilisateur non expert :
+Commande guidée pour utilisateur non expert :
 
 ```powershell
 cc-formation-optimizer guided-run --config config/config_ear2027.yaml
 ```
 
-Elle orchestre les controles, la preparation, les diagonales de temps, le
-diagnostic, l'optimisation optionnelle, les exports et la surcouche metier. Elle
-ne modifie pas le modele CP-SAT ni les parametres metier YAML.
+Elle orchestre les contrôles, la préparation, les diagonales de temps, le
+diagnostic, l'optimisation optionnelle, les exports et la surcouche métier. Elle
+ne modifie pas le modèle CP-SAT ni les paramètres métier YAML.
 
 PowerShell : ne pas utiliser le backslash `\` comme continuation de ligne.
 
@@ -509,7 +509,7 @@ config compatibility_path optional
 `model_builder.py`
 
 - construit le modèle CP-SAT ;
-- cree les variables seulement pour les affectations admissibles et compatibles.
+- crée les variables seulement pour les affectations admissibles et compatibles.
 
 `solver.py`
 
@@ -610,7 +610,7 @@ min w_t * O_trajet + w_e * O_eligibilite + w_m * O_mixite
 Pas de coût fixe d'ouverture de session dans l'objectif actuel. Pas de pénalité
 territoriale dans l'objectif actuel.
 
-## 11. Résultats reels connus dans outputs/
+## 11. Résultats réels connus dans outputs/
 
 Depuis `outputs/reports/statistiques_solution.json` :
 
@@ -916,9 +916,9 @@ Le modèle interdit :
 
 - commune PC affectée à session TPC ;
 - trajet absent ;
-- trajet superieur au seuil `T` ;
+- trajet supérieur au seuil `T` ;
 - dépassement des budgets ;
-- dépassement de capacité dans la solution optimisee validée.
+- dépassement de capacité dans la solution optimisée validée.
 
 Questions métier ouvertes :
 
@@ -934,7 +934,7 @@ Questions métier ouvertes :
 - `render-map` ne relance jamais le solveur.
 - `postprocess-business-rules` ne relance jamais le solveur.
 - Modifier `config/config_ear2027.yaml` ne modifie pas les exports existants.
-- Pour appliquer un YAML modifie, relancer `solve` ou `solve-relaxed`.
+- Pour appliquer un YAML modifié, relancer `solve` ou `solve-relaxed`.
 - Pour appliquer de nouvelles données brutes, relancer `prepare-data`.
 - Vérifier `outputs/reports/config_utilisee.yaml` pour connaître la config qui a
   produit des exports existants.
@@ -983,7 +983,7 @@ cc-formation-optimizer solve-relaxed --config config/config_ear2027.yaml --expor
 
 Pour une modification de code :
 
-1. changements limites au perimêtre ;
+1. changements limités au périmètre ;
 2. tests existants et nouveaux tests pertinents ;
 3. `pytest` OK ;
 4. documentation mise à jour si comportement visible ;
