@@ -35,6 +35,8 @@ Priorités pour toute IA qui reprend le projet :
 
 Nom Python : `cc-formation-optimizer`
 Package : `src/cc_formation_optimizer/`
+Version Python minimale commune au projet principal et a `travel_time_core` :
+`>=3.12`. Toute venv locale doit etre creee avec Python 3.12 ou plus recent.
 Commande console déclarée dans `pyproject.toml` :
 
 ```text

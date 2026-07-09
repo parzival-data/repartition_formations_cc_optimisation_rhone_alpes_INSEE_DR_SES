@@ -7,10 +7,13 @@ Le contrat entre les deux projets est uniquement un echange de fichiers CSV ou O
 
 ## Installation
 
+Ce sous-projet utilise la meme version minimale que le projet principal :
+Python 3.12 ou plus recent.
+
 Depuis le dossier `travel_time_core` :
 
 ```powershell
-python -m venv .venv
+py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e ".[dev]"
 ```
 

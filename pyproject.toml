@@ -7,7 +7,7 @@ name = "cc-formation-optimizer"
 version = "0.1.0"
 description = "Optimisation de la repartition des coordonnateurs communaux en formations EAR 2027."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "ortools>=9.10",
     "PyYAML>=6.0",

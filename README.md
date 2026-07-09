@@ -59,10 +59,13 @@ Le pipeline principal suit ces étapes :
 
 ## Installation
 
+Le projet principal et `travel_time_core` demandent tous les deux Python 3.12
+minimum. La venv doit donc etre creee avec Python 3.12 ou plus recent.
+
 Depuis la racine du dépôt :
 
 ```bash
-python -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e ".[dev]"
 ```
@@ -70,6 +73,7 @@ python -m pip install -e ".[dev]"
 Sous PowerShell, l'activation de l'environnement virtuel s'écrit plutôt :
 
 ```powershell
+py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev]"
 ```
@@ -112,6 +116,99 @@ config/schema.yaml
 Pour le détail des champs et des invariants, voir
 [`docs/03_configuration_yaml.md`](docs/03_configuration_yaml.md).
 
+## Données d'entrée recommandées
+
+Le chemin recommandé est de préparer manuellement les CSV propres attendus par
+l'optimiseur, plutôt que d'utiliser systématiquement la commande `prepare-data`.
+Cette commande reste disponible pour convertir des fichiers bruts `.ods`, mais
+elle est surtout utile comme outil ponctuel d'import. Pour un usage maîtrisé, il
+vaut mieux placer directement les fichiers propres dans :
+
+```text
+data/processed/
+```
+
+### Communes
+
+Nom attendu par la configuration courante :
+
+```text
+data/processed/communes_clean.csv
+```
+
+Colonnes obligatoires :
+
+```text
+code_commune,nom_commune,population,categorie
+```
+
+Colonnes optionnelles utiles :
+
+```text
+territoire_EAR,logements,latitude,longitude
+```
+
+Règles :
+
+- `code_commune` : identifiant de commune, utilisé comme clé dans tous les
+  autres fichiers ;
+- `categorie` : uniquement `PC` ou `TPC` ;
+- `population` : entier positif ou nul, utilisé pour calculer le nombre de CC ;
+- `latitude` et `longitude` : optionnelles, mais nécessaires pour la carte HTML.
+
+### Temps de trajet
+
+Nom attendu par la configuration courante :
+
+```text
+data/processed/temps_trajet_clean.csv
+```
+
+Colonnes obligatoires :
+
+```text
+code_commune_origine,code_commune_pivot,temps_minutes
+```
+
+Règles :
+
+- chaque ligne représente un trajet orienté `origine -> pivot` ;
+- `temps_minutes` doit être un entier positif ou nul ;
+- les trajets absents sont interdits par le modèle ;
+- les trajets supérieurs au seuil `T` configuré ne sont pas admissibles ;
+- il est recommandé d'inclure les diagonales `commune -> même commune` avec
+  `temps_minutes = 0`.
+
+### Liaisons bloquées optionnelles
+
+Par défaut, toutes les liaisons disposant d'un temps de trajet admissible sont
+compatibles métier (`b_ij = 1`). Pour bloquer explicitement certaines liaisons,
+créer un fichier :
+
+```text
+data/processed/compatibilites_clean.csv
+```
+
+Colonnes obligatoires :
+
+```text
+code_commune_origine,code_commune_pivot,compatible
+```
+
+Règles :
+
+- `compatible = 0` signifie que la liaison est interdite (`b_ij = 0`) ;
+- `compatible = 1` signifie que la liaison est autorisée ;
+- les lignes absentes restent autorisées par défaut ;
+- tous les codes doivent exister dans `communes_clean.csv`.
+
+Pour activer ce fichier, renseigner aussi dans `config/config_ear2027.yaml` :
+
+```yaml
+inputs:
+  compatibility_path: data/processed/compatibilites_clean.csv
+```
+
 ## Commandes principales
 
 ### Lancer l'exécution guidée
@@ -153,15 +250,17 @@ cc-formation-optimizer show-config --config config/config_ear2027.yaml
 Affiche les principaux paramètres métier : `T`, `Q`, `L`, `B`, `f`, `k`,
 `M_PC` et `M_TPC`.
 
-### (OPTION à ne pas utiliser tous le temps) Préparer les données réelles
+### Option secondaire : préparer les données depuis les fichiers bruts
 
 ```bash
 cc-formation-optimizer prepare-data --config config/config_ear2027.yaml --input-dir donnee_brut_EAR27 --output-dir data/processed --report
 ```
 
 Cette commande lit les fichiers bruts `.ods`, applique les mappings déclarés
-dans le YAML, produit les CSV propres dans `data/processed/` et, avec
-`--report`, écrit :
+dans le YAML et produit les CSV propres dans `data/processed/`. Elle est utile
+si les fichiers bruts doivent être convertis, mais le flux recommandé reste de
+fournir directement les CSV propres décrits plus haut. Avec `--report`, elle
+écrit :
 
 - `outputs/reports/rapport_preparation_donnees.md` ;
 - `outputs/reports/statistiques_preparation_donnees.json`.
