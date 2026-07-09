@@ -10,14 +10,19 @@ Le contrat entre les deux projets est uniquement un echange de fichiers CSV ou O
 Ce sous-projet utilise la meme version minimale que le projet principal :
 Python 3.12 ou plus recent.
 
-Depuis le dossier `travel_time_core` :
+Depuis la racine du depot, installer les dependances communes :
 
 ```powershell
-py -3.12 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+python -m pip install -r requirements.txt
 ```
 
-La console expose deux noms equivalents apres installation :
+Pour exposer aussi les commandes console du sous-projet :
+
+```powershell
+python -m pip install -e .\travel_time_core
+```
+
+Deux noms equivalents sont alors disponibles :
 
 ```powershell
 travel-time-core --help

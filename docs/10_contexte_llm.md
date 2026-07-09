@@ -36,7 +36,15 @@ Priorités pour toute IA qui reprend le projet :
 Nom Python : `cc-formation-optimizer`
 Package : `src/cc_formation_optimizer/`
 Version Python minimale commune au projet principal et a `travel_time_core` :
-`>=3.12`. Toute venv locale doit etre creee avec Python 3.12 ou plus recent.
+`>=3.12`. Les dependances communes sont listees dans `requirements.txt` et
+peuvent etre installees depuis la racine du depot avec :
+
+```powershell
+python -m pip install -r requirements.txt
+```
+
+Une venv locale reste possible, mais elle n'est pas requise par la documentation
+du projet.
 Commande console déclarée dans `pyproject.toml` :
 
 ```text
@@ -940,8 +948,10 @@ Questions métier ouvertes :
 - Pour appliquer de nouvelles données brutes, relancer `prepare-data`.
 - Vérifier `outputs/reports/config_utilisee.yaml` pour connaître la config qui a
   produit des exports existants.
-- Le script console `cc-formation-optimizer` n'existe qu'après installation du
-  package (`python -m pip install -e ".[dev]"` ou equivalent).
+- `requirements.txt` installe les dependances communes du depot, mais pas le
+  package local.
+- Le script console `cc-formation-optimizer` n'existe qu'apres installation du
+  package local (`python -m pip install -e .` depuis la racine du depot).
 - En PowerShell, ne pas couper les commandes avec `\`.
 - Les outputs locaux peuvent être présents mais ignorés par Git.
 

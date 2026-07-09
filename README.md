@@ -60,27 +60,30 @@ Le pipeline principal suit ces étapes :
 ## Installation
 
 Le projet principal et `travel_time_core` demandent tous les deux Python 3.12
-minimum. La venv doit donc etre creee avec Python 3.12 ou plus recent.
+minimum. Il n'est pas necessaire de creer une venv dans le depot pour installer
+les dependances.
 
 Depuis la racine du dépôt :
 
-```bash
-python3.12 -m venv .venv
-source .venv/bin/activate
-python -m pip install -e ".[dev]"
+```powershell
+python -m pip install -r requirements.txt
 ```
 
-Sous PowerShell, l'activation de l'environnement virtuel s'écrit plutôt :
+Si l'installation doit se faire sans droits administrateur :
 
 ```powershell
-py -3.12 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -e ".[dev]"
+python -m pip install --user -r requirements.txt
 ```
 
-L'installation expose la commande :
+Pour exposer aussi la commande console du projet principal :
 
-```bash
+```powershell
+python -m pip install -e .
+```
+
+La commande devient alors disponible :
+
+```powershell
 cc-formation-optimizer --help
 ```
 
