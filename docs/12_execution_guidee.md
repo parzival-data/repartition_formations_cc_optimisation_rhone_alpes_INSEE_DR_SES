@@ -66,6 +66,35 @@ peut corriger les diagonales présentes avec un temps non nul. Un rapport est
 outputs/reports/rapport_diagonale_temps_trajet.json
 ```
 
+## Réponses aux confirmations
+
+Quand la commande affiche une question avec `[O/n]` ou `[o/N]`, la lettre en
+majuscule indique la réponse par défaut si l'utilisateur appuie simplement sur
+`Entrée`.
+
+```text
+[O/n]
+```
+
+signifie que `Oui` est la réponse par défaut :
+
+- `Entrée` : oui ;
+- `o`, `oui`, `y` ou `yes` : oui ;
+- `n` ou `non` : non.
+
+```text
+[o/N]
+```
+
+signifie que `Non` est la réponse par défaut :
+
+- `Entrée` : non ;
+- `o`, `oui`, `y` ou `yes` : oui ;
+- `n` ou `non` : non.
+
+Les étapes longues ou importantes, comme le calcul des temps de trajet ou le
+solveur, utilisent généralement `[o/N]` pour éviter un lancement involontaire.
+
 ## Temps de trajet
 
 Le calcul des temps reste porté par le sous-projet indépendant
